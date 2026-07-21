@@ -59,10 +59,13 @@ const gracefulShutdown = (signal) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('uncaughtException', (error) => {
+    console.error('CRITICAL: Uncaught Exception thrown!', error);
     logger_1.default.error('CRITICAL: Uncaught Exception thrown!', { error });
     gracefulShutdown('uncaughtException');
 });
 process.on('unhandledRejection', (reason) => {
+    console.error('CRITICAL: Unhandled Promise Rejection!', reason);
     logger_1.default.error('CRITICAL: Unhandled Promise Rejection!', { reason: String(reason) });
     gracefulShutdown('unhandledRejection');
 });
+// Trigger restart comment to auto-boot user server

@@ -50,7 +50,7 @@ export const startTelemetrySimulator = (): void => {
       `[SIMULATOR]\nPublishing telemetry\nTopic: ${topic}\nPayload:\n${JSON.stringify(payload, null, 2)}`,
     );
 
-    // Publish to the local Mosquitto MQTT broker
+    // Publish to the HiveMQ Cloud MQTT broker
     mqttClient.publish(topic, JSON.stringify(payload), { qos: 1 }, (err) => {
       if (err) {
         logger.error(`[SIMULATOR] Failed to publish telemetry: ${err.message}`, { err });

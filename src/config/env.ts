@@ -17,7 +17,8 @@ const envSchema = z.object({
   MQTT_PORT: z
     .string()
     .transform((val) => parseInt(val, 10))
-    .default('1883'),
+    .default('8883'),
+  MQTT_PROTOCOL: z.string().default('mqtts'),
   MQTT_USERNAME: z.string().optional(),
   MQTT_PASSWORD: z.string().optional(),
   MQTT_CLIENT_ID: z.string().default('solar_backend'),

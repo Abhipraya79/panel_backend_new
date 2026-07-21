@@ -5,8 +5,8 @@ Dokumen ini mendefinisikan spesifikasi komunikasi MQTT antara mikrokontroler (ES
 ---
 
 ## 1. Broker Configuration
-- **Protocol**: `mqtt` (non-secure for development) / `mqtts` (secure with TLS/SSL for production)
-- **Port Default**: `1883` (Standard) / `8883` (SSL)
+- **Protocol**: `mqtts` (Secure connection with TLS/SSL using HiveMQ Cloud)
+- **Port**: `8883`
 - **Quality of Service (QoS)**: `QoS 1` (At least once - menjamin pesan sampai minimal 1 kali)
 - **Clean Session**: `true` (tidak menyimpan status session client ketika disconnect)
 - **Keep Alive**: `60 seconds`

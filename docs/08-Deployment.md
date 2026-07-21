@@ -87,7 +87,7 @@ Nginx dikonfigurasi sebagai gerbang depan untuk mengarahkan request port `80` / 
 ```nginx
 server {
     listen 80;
-    server_name api.solar-panel.studentproject.my.id;
+    server_name panel-care.allvvnt.my.id;
 
     location / {
         proxy_pass http://localhost:5000;
@@ -103,5 +103,5 @@ server {
 ```
 Untuk mengaktifkan SSL, gunakan Let's Encrypt / Certbot:
 ```bash
-sudo certbot --nginx -d api.solar-panel.studentproject.my.id
+sudo certbot --nginx -d panel-care.allvvnt.my.id
 ```

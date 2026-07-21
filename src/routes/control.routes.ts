@@ -7,4 +7,3 @@ router.post('/cleaning', postCleaningCommand);
 router.post('/cooling', postCoolingCommand);
 
 export default router;
-

@@ -20,7 +20,8 @@ const envSchema = zod_1.z.object({
     MQTT_PORT: zod_1.z
         .string()
         .transform((val) => parseInt(val, 10))
-        .default('1883'),
+        .default('8883'),
+    MQTT_PROTOCOL: zod_1.z.string().default('mqtts'),
     MQTT_USERNAME: zod_1.z.string().optional(),
     MQTT_PASSWORD: zod_1.z.string().optional(),
     MQTT_CLIENT_ID: zod_1.z.string().default('solar_backend'),
@@ -31,8 +32,8 @@ const envSchema = zod_1.z.object({
         .string()
         .min(1, 'FIREBASE_PRIVATE_KEY is required')
         .transform((val) => {
-        // Replace double escaped newlines (e.g. from JSON key or .env) with actual newlines
-        return val.replace(/\\n/g, '\n');
+        // Replace double escaped newlines (e.g. from JSON key or .env) with actual newlines and remove any quotes
+        return val.replace(/"/g, '').replace(/\\n/g, '\n');
     }),
     // JWT Settings
     JWT_SECRET: zod_1.z.string().min(8, 'JWT_SECRET must be at least 8 characters long'),

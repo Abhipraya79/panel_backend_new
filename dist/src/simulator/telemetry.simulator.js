@@ -45,7 +45,7 @@ const startTelemetrySimulator = () => {
         const topic = 'solar/panel/telemetry';
         // Logging formatted per instructions
         logger_1.default.info(`[SIMULATOR]\nPublishing telemetry\nTopic: ${topic}\nPayload:\n${JSON.stringify(payload, null, 2)}`);
-        // Publish to the local Mosquitto MQTT broker
+        // Publish to the HiveMQ Cloud MQTT broker
         mqtt_config_1.mqttClient.publish(topic, JSON.stringify(payload), { qos: 1 }, (err) => {
             if (err) {
                 logger_1.default.error(`[SIMULATOR] Failed to publish telemetry: ${err.message}`, { err });

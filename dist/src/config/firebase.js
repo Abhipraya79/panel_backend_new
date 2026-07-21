@@ -39,16 +39,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.messaging = exports.auth = exports.db = exports.admin = void 0;
 const admin = __importStar(require("firebase-admin"));
 exports.admin = admin;
-const path_1 = __importDefault(require("path"));
+const env_1 = require("./env");
 const logger_1 = __importDefault(require("../utils/logger"));
 let db;
 let auth;
 let messaging;
 try {
     logger_1.default.info('Initializing Firebase Admin SDK...');
-    const serviceAccountPath = path_1.default.join(process.cwd(), 'credentials', 'firebase-admin.json');
     admin.initializeApp({
-        credential: admin.credential.cert(serviceAccountPath),
+        credential: admin.credential.cert({
+            projectId: env_1.env.FIREBASE_PROJECT_ID,
+            clientEmail: env_1.env.FIREBASE_CLIENT_EMAIL,
+            privateKey: env_1.env.FIREBASE_PRIVATE_KEY,
+        }),
     });
     exports.db = db = admin.firestore();
     exports.auth = auth = admin.auth();

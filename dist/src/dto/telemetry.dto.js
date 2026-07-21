@@ -9,7 +9,7 @@ function toDashboardDTO(telemetry) {
     const receivedAtTime = telemetry.receivedAt ? new Date(telemetry.receivedAt).getTime() : 0;
     const now = new Date().getTime();
     // Calculate if the device is ONLINE (receivedAt is within 15 seconds)
-    const deviceStatus = (now - receivedAtTime < 15000) ? 'ONLINE' : 'OFFLINE';
+    const deviceStatus = now - receivedAtTime < 15000 ? 'ONLINE' : 'OFFLINE';
     return {
         deviceStatus,
         temperature: telemetry.temperature ?? 0,

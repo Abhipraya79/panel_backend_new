@@ -6,7 +6,7 @@ Dokumen ini mendefinisikan API Endpoint untuk aplikasi mobile Flutter.
 
 ## 1. Base URL
 - Development: `http://localhost:5000`
-- Production: `https://api.solar-panel.studentproject.my.id`
+- Production: `http://panel-care.allvvnt.my.id/api`
 
 ---
 
