@@ -9,6 +9,15 @@ const telemetry_validator_1 = require("../validators/telemetry.validator");
 const status_validator_1 = require("../validators/status.validator");
 const event_validator_1 = require("../validators/event.validator");
 const telemetry_service_1 = require("../services/telemetry.service");
+const socket_server_1 = require("../socket/socket.server");
+const socket_events_1 = require("../socket/socket.events");
+const device_repository_1 = require("../repositories/device.repository");
+const event_repository_1 = require("../repositories/event.repository");
+// ─── Telemetry transition tracking for cleaning completion detection ─────────
+// When ESP finishes cleaning, pumpStatus and wiperStatus transition from true → false.
+// We track the previous values to detect this transition.
+let previousPumpStatus = null;
+let previousWiperStatus = null;
 const handleMQTTMessage = async (topic, message) => {
     const payloadStr = message.toString();
     try {
@@ -37,6 +46,29 @@ ${JSON.stringify(result.data, null, 2)}`;
                 logger_1.default.info(logMessage);
                 // Forward to TelemetryService
                 await telemetry_service_1.TelemetryService.saveTelemetry(result.data, topic);
+                // ─── Cleaning completion detection via telemetry transition ──────
+                // Detect pump & wiper transitioning from ON → OFF after cleaning started.
+                const currentPump = result.data.pumpStatus ?? null;
+                const currentWiper = result.data.wiperStatus ?? null;
+                if (previousPumpStatus === true &&
+                    previousWiperStatus === true &&
+                    currentPump === false &&
+                    currentWiper === false) {
+                    logger_1.default.info('[MQTT] Cleaning completion detected via telemetry transition (pump: ON→OFF, wiper: ON→OFF)');
+                    try {
+                        const io = (0, socket_server_1.getSocketIO)();
+                        io.emit(socket_events_1.SOCKET_EVENTS.CLEANING_STATUS, { status: 'completed' });
+                        logger_1.default.info(`[SOCKET] Emitted ${socket_events_1.SOCKET_EVENTS.CLEANING_STATUS} — cleaning completed (telemetry transition)`);
+                    }
+                    catch (socketError) {
+                        logger_1.default.error(`[SOCKET] Failed to emit cleaning status: ${socketError.message || socketError}`);
+                    }
+                }
+                // Update previous status tracking
+                if (currentPump !== null)
+                    previousPumpStatus = currentPump;
+                if (currentWiper !== null)
+                    previousWiperStatus = currentWiper;
             }
             else {
                 const reasons = result.error.errors.map((err) => err.message);
@@ -62,6 +94,15 @@ ${topic}
 Payload:
 ${JSON.stringify(result.data, null, 2)}`;
                 logger_1.default.info(logMessage);
+                try {
+                    const status = result.data.status.toUpperCase() === 'ONLINE' ? 'ONLINE' : 'OFFLINE';
+                    await device_repository_1.DeviceRepository.updateStatus(result.data.deviceId, status);
+                    const io = (0, socket_server_1.getSocketIO)();
+                    io.emit(socket_events_1.SOCKET_EVENTS.TELEMETRY_NEW, { deviceStatus: status }); // Emit as part of telemetry or separate event
+                }
+                catch (error) {
+                    logger_1.default.error(`Error saving status: ${error.message}`);
+                }
             }
             else {
                 const reasons = result.error.errors.map((err) => err.message);
@@ -87,6 +128,33 @@ ${topic}
 Payload:
 ${JSON.stringify(result.data, null, 2)}`;
                 logger_1.default.info(logMessage);
+                try {
+                    const eventObj = {
+                        deviceId: result.data.deviceId,
+                        event: result.data.event,
+                        timestamp: result.data.timestamp,
+                    };
+                    await event_repository_1.EventRepository.save(eventObj);
+                    const io = (0, socket_server_1.getSocketIO)();
+                    io.emit(socket_events_1.SOCKET_EVENTS.EVENT_NEW, eventObj);
+                }
+                catch (error) {
+                    logger_1.default.error(`Error saving event: ${error.message}`);
+                }
+                // ─── Cleaning completion detection via event feedback ────────────
+                // ESP sends event "Cleaning completed" when cleaning cycle is done.
+                if (typeof result.data.event === 'string' &&
+                    result.data.event.toLowerCase().includes('cleaning completed')) {
+                    logger_1.default.info('[MQTT] Cleaning completion detected via event feedback from ESP');
+                    try {
+                        const io = (0, socket_server_1.getSocketIO)();
+                        io.emit(socket_events_1.SOCKET_EVENTS.CLEANING_STATUS, { status: 'completed' });
+                        logger_1.default.info(`[SOCKET] Emitted ${socket_events_1.SOCKET_EVENTS.CLEANING_STATUS} — cleaning completed (event feedback)`);
+                    }
+                    catch (socketError) {
+                        logger_1.default.error(`[SOCKET] Failed to emit cleaning status: ${socketError.message || socketError}`);
+                    }
+                }
             }
             else {
                 const reasons = result.error.errors.map((err) => err.message);

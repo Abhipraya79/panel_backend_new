@@ -5,7 +5,6 @@ import { mqttClient } from './config/mqtt.config';
 import { db } from './config/firebase';
 import { initializeMQTT } from './mqtt';
 import { initializeSocket } from './socket/socket.server';
-import { startTelemetrySimulator, stopTelemetrySimulator } from './simulator/telemetry.simulator';
 
 // Log status of Firebase initialization
 if (db) {
@@ -14,14 +13,9 @@ if (db) {
   logger.warn('Firebase services are bypassed or failed initialization.');
 }
 
-// Log status of MQTT connection attempt
 if (mqttClient) {
   logger.info('MQTT client instance instantiated.');
   initializeMQTT();
-
-  if (env.ENABLE_SIMULATOR) {
-    startTelemetrySimulator();
-  }
 }
 
 const server = app.listen(env.PORT, () => {
@@ -33,10 +27,6 @@ initializeSocket(server);
 // Handle graceful shutdown and unhandled promise/exception situations
 const gracefulShutdown = (signal: string) => {
   logger.warn(`Received ${signal}. Shutting down server gracefully...`);
-
-  if (env.ENABLE_SIMULATOR) {
-    stopTelemetrySimulator();
-  }
 
   server.close(() => {
     logger.info('HTTP server closed.');

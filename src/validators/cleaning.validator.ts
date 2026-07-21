@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 export const cleaningCommandSchema = z.object({
-  action: z.enum(['START', 'STOP'], {
+  action: z.enum(['START'], {
     errorMap: () => ({
-      message: 'action must be one of: START, STOP',
+      message: 'action must be: START',
     }),
   }),
   mode: z.enum(['MANUAL', 'AUTO_RTC'], {

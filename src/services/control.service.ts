@@ -18,9 +18,8 @@ export class ControlService {
     payload: CleaningCommandPayload,
   ): Promise<CleaningResult> {
     const { action, mode } = payload;
-    const isStart = action === 'START';
-    const pump = isStart;
-    const wiper = isStart;
+    const pump = true;
+    const wiper = true;
     const timestamp = new Date().toISOString();
 
     const mqttPayload = {

@@ -10,7 +10,6 @@ const mqtt_config_1 = require("./config/mqtt.config");
 const firebase_1 = require("./config/firebase");
 const mqtt_1 = require("./mqtt");
 const socket_server_1 = require("./socket/socket.server");
-const telemetry_simulator_1 = require("./simulator/telemetry.simulator");
 // Log status of Firebase initialization
 if (firebase_1.db) {
     logger_1.default.info('Firebase Firestore ready.');
@@ -18,13 +17,9 @@ if (firebase_1.db) {
 else {
     logger_1.default.warn('Firebase services are bypassed or failed initialization.');
 }
-// Log status of MQTT connection attempt
 if (mqtt_config_1.mqttClient) {
     logger_1.default.info('MQTT client instance instantiated.');
     (0, mqtt_1.initializeMQTT)();
-    if (env_1.env.ENABLE_SIMULATOR) {
-        (0, telemetry_simulator_1.startTelemetrySimulator)();
-    }
 }
 const server = app_1.default.listen(env_1.env.PORT, () => {
     logger_1.default.info(`🚀 Server running in [${env_1.env.NODE_ENV}] mode on port ${env_1.env.PORT}`);
@@ -33,9 +28,6 @@ const server = app_1.default.listen(env_1.env.PORT, () => {
 // Handle graceful shutdown and unhandled promise/exception situations
 const gracefulShutdown = (signal) => {
     logger_1.default.warn(`Received ${signal}. Shutting down server gracefully...`);
-    if (env_1.env.ENABLE_SIMULATOR) {
-        (0, telemetry_simulator_1.stopTelemetrySimulator)();
-    }
     server.close(() => {
         logger_1.default.info('HTTP server closed.');
         // Close MQTT Client if connected
