@@ -1,19 +1,25 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.toDashboardDTO = toDashboardDTO;
+const device_repository_1 = require("../repositories/device.repository");
 /**
  * Transforms raw telemetry data from Firestore into DashboardDTO format.
- * Determines deviceStatus based on receivedAt timestamp (ONLINE if < 15 seconds, otherwise OFFLINE).
+ * Device status is resolved from the devices collection (set by MQTT solar/panel/status topic).
  */
-function toDashboardDTO(telemetry) {
-    const receivedAtTime = telemetry.receivedAt ? new Date(telemetry.receivedAt).getTime() : 0;
-    const now = new Date().getTime();
-    // Calculate if the device is ONLINE (receivedAt is within 15 seconds)
-    const deviceStatus = now - receivedAtTime < 15000 ? 'ONLINE' : 'OFFLINE';
+async function toDashboardDTO(telemetry, deviceId = 'panel001') {
+    // Read device status from Firestore (source of truth: ESP solar/panel/status topic)
+    let deviceStatus = 'OFFLINE';
+    try {
+        deviceStatus = await device_repository_1.DeviceRepository.getStatus(deviceId);
+    }
+    catch {
+        // If device doc doesn't exist yet, default to OFFLINE
+        deviceStatus = 'OFFLINE';
+    }
     return {
         deviceStatus,
         temperature: telemetry.temperature ?? 0,
-        humidity: telemetry.humidity ?? 0,
+        airTemp: telemetry.airTemp ?? 0,
         dust: telemetry.dust ?? 0,
         voltage: telemetry.voltage ?? 0,
         current: telemetry.current ?? 0,

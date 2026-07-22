@@ -25,15 +25,12 @@ export const handleMQTTMessage = async (topic: string, message: Buffer): Promise
     if (topic === 'solar/panel/telemetry') {
       const result = telemetryPayloadSchema.safeParse(parsedPayload);
       if (result.success) {
-        const logMessage = `[MQTT]\n\nPayload Valid\n\nTopic:\n${topic}\n\nPayload:\n${JSON.stringify(result.data, null, 2)}`;
-        logger.info(logMessage);
-
-        // Forward to TelemetryService (saves to Firestore + emits Socket.IO telemetry:update)
+        logger.info(`[MQTT] Valid telemetry received for device: ${result.data.deviceId}`);
+        // Forward to TelemetryService (emits Socket.IO + persists to Firestore)
         await TelemetryService.saveTelemetry(result.data, topic);
       } else {
         const reasons = result.error.errors.map((err) => err.message);
-        const logMessage = `[MQTT]\n\nPayload Invalid\n\nReason:\n${reasons.map((r) => `- ${r}`).join('\n')}`;
-        logger.info(logMessage);
+        logger.warn(`[MQTT] Invalid telemetry payload: ${reasons.join(', ')}`);
       }
 
     // ─── STATUS ───────────────────────────────────────────────────────────────

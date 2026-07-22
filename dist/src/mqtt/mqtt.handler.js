@@ -13,11 +13,6 @@ const socket_server_1 = require("../socket/socket.server");
 const socket_events_1 = require("../socket/socket.events");
 const device_repository_1 = require("../repositories/device.repository");
 const event_repository_1 = require("../repositories/event.repository");
-// ─── Telemetry transition tracking for cleaning completion detection ─────────
-// When ESP finishes cleaning, pumpStatus and wiperStatus transition from true → false.
-// We track the previous values to detect this transition.
-let previousPumpStatus = null;
-let previousWiperStatus = null;
 const handleMQTTMessage = async (topic, message) => {
     const payloadStr = message.toString();
     try {
@@ -26,79 +21,38 @@ const handleMQTTMessage = async (topic, message) => {
             parsedPayload = JSON.parse(payloadStr);
         }
         catch {
-            // If payload is not valid JSON, print invalid payload message with reason
             const logMessage = `[MQTT]\n\nPayload Invalid\n\nReason:\n- Payload is not a valid JSON string`;
             logger_1.default.info(logMessage);
             return;
         }
+        // ─── TELEMETRY ────────────────────────────────────────────────────────────
         if (topic === 'solar/panel/telemetry') {
             const result = telemetry_validator_1.telemetryPayloadSchema.safeParse(parsedPayload);
             if (result.success) {
-                const logMessage = `[MQTT]
-
-Payload Valid
-
-Topic:
-${topic}
-
-Payload:
-${JSON.stringify(result.data, null, 2)}`;
-                logger_1.default.info(logMessage);
-                // Forward to TelemetryService
+                logger_1.default.info(`[MQTT] Valid telemetry received for device: ${result.data.deviceId}`);
+                // Forward to TelemetryService (emits Socket.IO + persists to Firestore)
                 await telemetry_service_1.TelemetryService.saveTelemetry(result.data, topic);
-                // ─── Cleaning completion detection via telemetry transition ──────
-                // Detect pump & wiper transitioning from ON → OFF after cleaning started.
-                const currentPump = result.data.pumpStatus ?? null;
-                const currentWiper = result.data.wiperStatus ?? null;
-                if (previousPumpStatus === true &&
-                    previousWiperStatus === true &&
-                    currentPump === false &&
-                    currentWiper === false) {
-                    logger_1.default.info('[MQTT] Cleaning completion detected via telemetry transition (pump: ON→OFF, wiper: ON→OFF)');
-                    try {
-                        const io = (0, socket_server_1.getSocketIO)();
-                        io.emit(socket_events_1.SOCKET_EVENTS.CLEANING_STATUS, { status: 'completed' });
-                        logger_1.default.info(`[SOCKET] Emitted ${socket_events_1.SOCKET_EVENTS.CLEANING_STATUS} — cleaning completed (telemetry transition)`);
-                    }
-                    catch (socketError) {
-                        logger_1.default.error(`[SOCKET] Failed to emit cleaning status: ${socketError.message || socketError}`);
-                    }
-                }
-                // Update previous status tracking
-                if (currentPump !== null)
-                    previousPumpStatus = currentPump;
-                if (currentWiper !== null)
-                    previousWiperStatus = currentWiper;
             }
             else {
                 const reasons = result.error.errors.map((err) => err.message);
-                const logMessage = `[MQTT]
-
-Payload Invalid
-
-Reason:
-${reasons.map((r) => `- ${r}`).join('\n')}`;
-                logger_1.default.info(logMessage);
+                logger_1.default.warn(`[MQTT] Invalid telemetry payload: ${reasons.join(', ')}`);
             }
+            // ─── STATUS ───────────────────────────────────────────────────────────────
         }
         else if (topic === 'solar/panel/status') {
             const result = status_validator_1.statusPayloadSchema.safeParse(parsedPayload);
             if (result.success) {
-                const logMessage = `[MQTT]
-
-Payload Valid
-
-Topic:
-${topic}
-
-Payload:
-${JSON.stringify(result.data, null, 2)}`;
+                const logMessage = `[MQTT]\n\nPayload Valid\n\nTopic:\n${topic}\n\nPayload:\n${JSON.stringify(result.data, null, 2)}`;
                 logger_1.default.info(logMessage);
                 try {
                     const status = result.data.status.toUpperCase() === 'ONLINE' ? 'ONLINE' : 'OFFLINE';
                     await device_repository_1.DeviceRepository.updateStatus(result.data.deviceId, status);
                     const io = (0, socket_server_1.getSocketIO)();
-                    io.emit(socket_events_1.SOCKET_EVENTS.TELEMETRY_NEW, { deviceStatus: status }); // Emit as part of telemetry or separate event
+                    io.emit(socket_events_1.SOCKET_EVENTS.STATUS_UPDATE, {
+                        deviceId: result.data.deviceId,
+                        status,
+                    });
+                    logger_1.default.info(`[SOCKET] Emitted ${socket_events_1.SOCKET_EVENTS.STATUS_UPDATE} — ${status}`);
                 }
                 catch (error) {
                     logger_1.default.error(`Error saving status: ${error.message}`);
@@ -106,27 +60,15 @@ ${JSON.stringify(result.data, null, 2)}`;
             }
             else {
                 const reasons = result.error.errors.map((err) => err.message);
-                const logMessage = `[MQTT]
-
-Payload Invalid
-
-Reason:
-${reasons.map((r) => `- ${r}`).join('\n')}`;
+                const logMessage = `[MQTT]\n\nPayload Invalid\n\nReason:\n${reasons.map((r) => `- ${r}`).join('\n')}`;
                 logger_1.default.info(logMessage);
             }
+            // ─── EVENT ────────────────────────────────────────────────────────────────
         }
         else if (topic === 'solar/panel/event') {
             const result = event_validator_1.eventPayloadSchema.safeParse(parsedPayload);
             if (result.success) {
-                const logMessage = `[MQTT]
-
-Payload Valid
-
-Topic:
-${topic}
-
-Payload:
-${JSON.stringify(result.data, null, 2)}`;
+                const logMessage = `[MQTT]\n\nPayload Valid\n\nTopic:\n${topic}\n\nPayload:\n${JSON.stringify(result.data, null, 2)}`;
                 logger_1.default.info(logMessage);
                 try {
                     const eventObj = {
@@ -137,19 +79,21 @@ ${JSON.stringify(result.data, null, 2)}`;
                     await event_repository_1.EventRepository.save(eventObj);
                     const io = (0, socket_server_1.getSocketIO)();
                     io.emit(socket_events_1.SOCKET_EVENTS.EVENT_NEW, eventObj);
+                    logger_1.default.info(`[SOCKET] Emitted ${socket_events_1.SOCKET_EVENTS.EVENT_NEW} — ${eventObj.event}`);
                 }
                 catch (error) {
                     logger_1.default.error(`Error saving event: ${error.message}`);
                 }
-                // ─── Cleaning completion detection via event feedback ────────────
-                // ESP sends event "Cleaning completed" when cleaning cycle is done.
+                // ─── Cleaning completion detection (ESP is source of truth) ──────────
+                // ESP sends event "Cleaning Finished" (or similar) when cleaning cycle is done.
                 if (typeof result.data.event === 'string' &&
-                    result.data.event.toLowerCase().includes('cleaning completed')) {
+                    (result.data.event.toLowerCase().includes('cleaning finished') ||
+                        result.data.event.toLowerCase().includes('cleaning completed'))) {
                     logger_1.default.info('[MQTT] Cleaning completion detected via event feedback from ESP');
                     try {
                         const io = (0, socket_server_1.getSocketIO)();
-                        io.emit(socket_events_1.SOCKET_EVENTS.CLEANING_STATUS, { status: 'completed' });
-                        logger_1.default.info(`[SOCKET] Emitted ${socket_events_1.SOCKET_EVENTS.CLEANING_STATUS} — cleaning completed (event feedback)`);
+                        io.emit(socket_events_1.SOCKET_EVENTS.CLEANING_UPDATE, { status: 'idle' });
+                        logger_1.default.info(`[SOCKET] Emitted ${socket_events_1.SOCKET_EVENTS.CLEANING_UPDATE} — cleaning idle (completed)`);
                     }
                     catch (socketError) {
                         logger_1.default.error(`[SOCKET] Failed to emit cleaning status: ${socketError.message || socketError}`);
@@ -158,14 +102,10 @@ ${JSON.stringify(result.data, null, 2)}`;
             }
             else {
                 const reasons = result.error.errors.map((err) => err.message);
-                const logMessage = `[MQTT]
-
-Payload Invalid
-
-Reason:
-${reasons.map((r) => `- ${r}`).join('\n')}`;
+                const logMessage = `[MQTT]\n\nPayload Invalid\n\nReason:\n${reasons.map((r) => `- ${r}`).join('\n')}`;
                 logger_1.default.info(logMessage);
             }
+            // ─── UNKNOWN TOPIC ────────────────────────────────────────────────────────
         }
         else {
             logger_1.default.warn(`[MQTT] Received message on unknown topic: ${topic}`);

@@ -32,9 +32,9 @@ exports.telemetryPayloadSchema = zod_1.z.object({
         invalid_type_error: 'dust must be number',
     })
         .optional(),
-    humidity: zod_1.z
+    airTemp: zod_1.z
         .number({
-        invalid_type_error: 'humidity must be number',
+        invalid_type_error: 'airTemp must be number',
     })
         .optional(),
     pumpStatus: zod_1.z

@@ -3,14 +3,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const env_1 = require("./config/env"); // Must be first to validate env vars
+const env_1 = require("./config/env");
 const logger_1 = __importDefault(require("./utils/logger"));
 const app_1 = __importDefault(require("./app"));
 const mqtt_config_1 = require("./config/mqtt.config");
 const firebase_1 = require("./config/firebase");
 const mqtt_1 = require("./mqtt");
 const socket_server_1 = require("./socket/socket.server");
-// Log status of Firebase initialization
 if (firebase_1.db) {
     logger_1.default.info('Firebase Firestore ready.');
 }
@@ -25,12 +24,10 @@ const server = app_1.default.listen(env_1.env.PORT, () => {
     logger_1.default.info(`🚀 Server running in [${env_1.env.NODE_ENV}] mode on port ${env_1.env.PORT}`);
 });
 (0, socket_server_1.initializeSocket)(server);
-// Handle graceful shutdown and unhandled promise/exception situations
 const gracefulShutdown = (signal) => {
     logger_1.default.warn(`Received ${signal}. Shutting down server gracefully...`);
     server.close(() => {
         logger_1.default.info('HTTP server closed.');
-        // Close MQTT Client if connected
         if (mqtt_config_1.mqttClient.connected) {
             logger_1.default.info('Closing MQTT Connection...');
             mqtt_config_1.mqttClient.end(false, {}, () => {

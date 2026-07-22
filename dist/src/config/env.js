@@ -37,11 +37,6 @@ const envSchema = zod_1.z.object({
     }),
     // JWT Settings
     JWT_SECRET: zod_1.z.string().min(8, 'JWT_SECRET must be at least 8 characters long'),
-    // Simulator Settings
-    ENABLE_SIMULATOR: zod_1.z
-        .string()
-        .transform((val) => val === 'true')
-        .default('false'),
 });
 let env;
 try {

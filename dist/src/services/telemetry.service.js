@@ -10,50 +10,61 @@ const socket_events_1 = require("../socket/socket.events");
 const logger_1 = __importDefault(require("../utils/logger"));
 const telemetry_dto_1 = require("../dto/telemetry.dto");
 class TelemetryService {
+    static latestTelemetryCache = new Map();
     static async saveTelemetry(payload, topic) {
-        // 1. Save to Firestore
-        await telemetry_repository_1.TelemetryRepository.save(payload, topic, 'mqtt');
-        // 2. Emit Socket.IO event (wrapped in try/catch to avoid crash)
+        const receivedAt = new Date().toISOString();
+        const emitPayload = {
+            deviceId: payload.deviceId,
+            temperature: payload.temperature,
+            voltage: payload.voltage,
+            current: payload.current,
+            power: payload.power,
+            dust: payload.dust,
+            airTemp: payload.airTemp,
+            pumpStatus: payload.pumpStatus,
+            wiperStatus: payload.wiperStatus,
+            mode: payload.mode,
+            receivedAt,
+        };
+        // Update in-memory cache immediately for sub-millisecond REST API queries
+        TelemetryService.latestTelemetryCache.set(payload.deviceId || 'panel001', emitPayload);
+        // 1. Emit Socket.IO event IMMEDIATELY for zero latency delivery to Flutter
         try {
             const io = (0, socket_server_1.getSocketIO)();
-            const emitPayload = {
-                deviceId: payload.deviceId,
-                temperature: payload.temperature,
-                voltage: payload.voltage,
-                current: payload.current,
-                power: payload.power,
-                dust: payload.dust,
-                humidity: payload.humidity,
-                pumpStatus: payload.pumpStatus,
-                wiperStatus: payload.wiperStatus,
-                mode: payload.mode,
-                receivedAt: new Date().toISOString(),
-            };
-            io.emit(socket_events_1.SOCKET_EVENTS.TELEMETRY_NEW, emitPayload);
+            io.emit(socket_events_1.SOCKET_EVENTS.TELEMETRY_UPDATE, emitPayload);
             const clientCount = io.sockets.sockets.size;
-            logger_1.default.info(`[SOCKET]
-
-Telemetry emitted
-
-Socket Clients
-${clientCount}`);
+            logger_1.default.info(`[SOCKET] Realtime telemetry emitted to ${clientCount} clients (${payload.deviceId})`);
         }
         catch (error) {
-            logger_1.default.error(`[SOCKET]\n\nFailed to emit telemetry\n\nReason:\n${error.message || error}`);
+            logger_1.default.error(`[SOCKET] Failed to emit telemetry: ${error.message || error}`);
+        }
+        // 2. Persist to Firestore concurrently (non-blocking)
+        try {
+            await telemetry_repository_1.TelemetryRepository.save(payload, topic, 'mqtt');
+        }
+        catch (error) {
+            logger_1.default.error(`[TELEMETRY] Firestore save error: ${error.message || error}`);
         }
     }
-    static async getLatestTelemetry() {
-        return await telemetry_repository_1.TelemetryRepository.getLatest();
+    static async getLatestTelemetry(deviceId = 'panel001') {
+        if (TelemetryService.latestTelemetryCache.has(deviceId)) {
+            return TelemetryService.latestTelemetryCache.get(deviceId);
+        }
+        const latestFromDb = await telemetry_repository_1.TelemetryRepository.getLatest();
+        if (latestFromDb) {
+            TelemetryService.latestTelemetryCache.set(deviceId, latestFromDb);
+        }
+        return latestFromDb;
     }
     static async getTelemetryHistory(page, limit) {
         return await telemetry_repository_1.TelemetryRepository.getHistory(page, limit);
     }
-    static async getDashboardData() {
-        const latest = await telemetry_repository_1.TelemetryRepository.getLatest();
+    static async getDashboardData(deviceId = 'panel001') {
+        const latest = await TelemetryService.getLatestTelemetry(deviceId);
         if (!latest) {
             return null;
         }
-        return (0, telemetry_dto_1.toDashboardDTO)(latest);
+        return await (0, telemetry_dto_1.toDashboardDTO)(latest, latest.deviceId || deviceId);
     }
 }
 exports.TelemetryService = TelemetryService;
