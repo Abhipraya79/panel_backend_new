@@ -5,7 +5,7 @@ export interface TelemetryEventPayload {
   current?: number;
   power?: number;
   dust?: number;
-  humidity?: number;
+  airTemp?: number;
   pumpStatus?: boolean;
   wiperStatus?: boolean;
   mode?: string;

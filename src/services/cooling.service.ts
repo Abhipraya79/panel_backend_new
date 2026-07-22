@@ -19,16 +19,10 @@ export class CoolingService {
   ): Promise<CoolingResult> {
     const { action } = payload;
     const isStart = action === 'START';
-    const peltier = isStart;
-    const fan = isStart;
-    const timestamp = new Date().toISOString();
 
+    // MQTT payload — only action as per ESP spec
     const mqttPayload = {
-      deviceId: DEVICE_ID,
       action,
-      peltier,
-      fan,
-      timestamp,
     };
 
     // 1. Publish to MQTT — must succeed before continuing
@@ -53,8 +47,6 @@ export class CoolingService {
       deviceId: DEVICE_ID,
       feature: 'cooling',
       action,
-      peltier,
-      fan,
       topic: COOLING_TOPIC,
       status: 'PUBLISHED',
       source: 'flutter',
@@ -67,15 +59,13 @@ export class CoolingService {
       const io = getSocketIO();
       const socketPayload = {
         isCooling: isStart,
-        peltier,
-        fan,
       };
 
-      io.emit(SOCKET_EVENTS.COOLING_STATUS, socketPayload);
+      io.emit(SOCKET_EVENTS.COOLING_UPDATE, socketPayload);
 
       const clientCount = io.sockets.sockets.size;
       logger.info(
-        `[COOLING] Socket emit success\n\nEvent: ${SOCKET_EVENTS.COOLING_STATUS}\n\nPayload:\n${JSON.stringify(socketPayload, null, 2)}\n\nSocket Clients\n${clientCount}`,
+        `[COOLING] Socket emit success\n\nEvent: ${SOCKET_EVENTS.COOLING_UPDATE}\n\nPayload:\n${JSON.stringify(socketPayload, null, 2)}\n\nSocket Clients\n${clientCount}`,
       );
     } catch (socketError: any) {
       logger.error(

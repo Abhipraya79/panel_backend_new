@@ -13,22 +13,26 @@ export interface CleaningResult {
   firestore: string;
 }
 
+export interface ModeResult {
+  mqtt: string;
+  firestore: string;
+}
+
 export class ControlService {
+  /**
+   * Publishes a cleaning START command to ESP via MQTT.
+   * Backend only sends START — never STOP.
+   * Cleaning completion is determined by ESP sending an event on solar/panel/event.
+   */
   public static async publishCleaningCommand(
     payload: CleaningCommandPayload,
   ): Promise<CleaningResult> {
     const { action, mode } = payload;
-    const pump = true;
-    const wiper = true;
-    const timestamp = new Date().toISOString();
 
+    // MQTT payload — only action and mode as per ESP spec
     const mqttPayload = {
-      deviceId: DEVICE_ID,
       action,
       mode,
-      pump,
-      wiper,
-      timestamp,
     };
 
     // 1. Publish to MQTT — must succeed before continuing
@@ -53,8 +57,6 @@ export class ControlService {
       deviceId: DEVICE_ID,
       action,
       mode,
-      pump,
-      wiper,
       topic: CONTROL_TOPIC,
       status: 'PUBLISHED',
       source: 'flutter',
@@ -62,23 +64,66 @@ export class ControlService {
 
     logger.info(`[CONTROL] Firestore save success`);
 
-    // 3. Emit Socket.IO event
+    // 3. Emit Socket.IO event — cleaning is now running
     try {
       const io = getSocketIO();
-      io.emit(SOCKET_EVENTS.CONTROL_NEW, {
-        action,
-        status: 'PUBLISHED',
+      io.emit(SOCKET_EVENTS.CLEANING_UPDATE, {
+        status: 'running',
       });
 
       const clientCount = io.sockets.sockets.size;
       logger.info(
-        `[CONTROL] Socket emit success\n\nEvent: ${SOCKET_EVENTS.CONTROL_NEW}\n\nSocket Clients\n${clientCount}`,
+        `[CONTROL] Socket emit success\n\nEvent: ${SOCKET_EVENTS.CLEANING_UPDATE}\n\nSocket Clients\n${clientCount}`,
       );
     } catch (socketError: any) {
       logger.error(
         `[CONTROL] Failed to emit socket event\n\nReason:\n${socketError.message || socketError}`,
       );
     }
+
+    return {
+      mqtt: 'PUBLISHED',
+      firestore: 'SAVED',
+    };
+  }
+
+  /**
+   * Publishes a mode change command to ESP via MQTT.
+   */
+  public static async publishModeCommand(mode: string): Promise<ModeResult> {
+    const mqttPayload = {
+      action: 'SET_MODE',
+      mode,
+    };
+
+    // 1. Publish to MQTT
+    logger.info(
+      `[CONTROL] Mode MQTT publish started\n\nTopic: ${CONTROL_TOPIC}\n\nPayload:\n${JSON.stringify(mqttPayload, null, 2)}`,
+    );
+
+    await new Promise<void>((resolve, reject) => {
+      mqttClient.publish(CONTROL_TOPIC, JSON.stringify(mqttPayload), { qos: 1 }, (err) => {
+        if (err) {
+          logger.error(`[CONTROL] Mode MQTT publish failed\n\nReason:\n${err.message}`, { err });
+          reject(err);
+        } else {
+          logger.info(`[CONTROL] Mode MQTT publish success\n\nTopic: ${CONTROL_TOPIC}`);
+          resolve();
+        }
+      });
+    });
+
+    // 2. Save to Firestore
+    await ControlRepository.save({
+      deviceId: DEVICE_ID,
+      action: 'SET_MODE',
+      mode,
+      topic: CONTROL_TOPIC,
+      status: 'PUBLISHED',
+      source: 'flutter',
+    });
+
+    logger.info(`[CONTROL] Mode Firestore save success`);
 
     return {
       mqtt: 'PUBLISHED',

@@ -21,22 +21,17 @@ export class TelemetryService {
         current: payload.current,
         power: payload.power,
         dust: payload.dust,
-        humidity: payload.humidity,
+        airTemp: payload.airTemp,
         pumpStatus: payload.pumpStatus,
         wiperStatus: payload.wiperStatus,
         mode: payload.mode,
         receivedAt: new Date().toISOString(),
       };
 
-      io.emit(SOCKET_EVENTS.TELEMETRY_NEW, emitPayload);
+      io.emit(SOCKET_EVENTS.TELEMETRY_UPDATE, emitPayload);
 
       const clientCount = io.sockets.sockets.size;
-      logger.info(`[SOCKET]
-
-Telemetry emitted
-
-Socket Clients
-${clientCount}`);
+      logger.info(`[SOCKET]\n\nTelemetry emitted\n\nSocket Clients\n${clientCount}`);
     } catch (error: any) {
       logger.error(`[SOCKET]\n\nFailed to emit telemetry\n\nReason:\n${error.message || error}`);
     }
@@ -55,6 +50,7 @@ ${clientCount}`);
     if (!latest) {
       return null;
     }
-    return toDashboardDTO(latest);
+    // toDashboardDTO is now async — reads device status from Firestore
+    return await toDashboardDTO(latest, latest.deviceId || 'panel001');
   }
 }

@@ -73,8 +73,6 @@ export const postCoolingCommand = async (
 
     const responseData = {
       isCooling: isStart,
-      peltier: isStart,
-      fan: isStart,
     };
 
     logger.info(
@@ -90,6 +88,47 @@ export const postCoolingCommand = async (
     });
   } catch (error: any) {
     logger.error(`[COOLING] POST /api/control/cooling - Error: ${error.message}`, { error });
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal Server Error',
+    });
+  }
+};
+
+export const postModeCommand = async (
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> => {
+  try {
+    const { mode } = req.body;
+
+    if (mode !== 'AUTO' && mode !== 'MANUAL') {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid mode. Mode must be either "AUTO" or "MANUAL".',
+      });
+      return;
+    }
+
+    logger.info(`[CONTROL] Mode change request received\n\nMode: ${mode}`);
+
+    const result = await ControlService.publishModeCommand(mode);
+
+    logger.info(
+      `[CONTROL] Mode HTTP response sent\n\nStatus: 200\n\nMode: ${mode}`,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Mode command published: ${mode}`,
+      data: { mode },
+      mqtt: result.mqtt,
+      firestore: result.firestore,
+    });
+  } catch (error: any) {
+    logger.error(`[CONTROL] POST /api/control/mode - Error: ${error.message}`, { error });
 
     res.status(500).json({
       success: false,

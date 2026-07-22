@@ -1,7 +1,9 @@
+import { DeviceRepository } from '../repositories/device.repository';
+
 export interface DashboardDTO {
   deviceStatus: 'ONLINE' | 'OFFLINE';
   temperature: number;
-  humidity: number;
+  airTemp: number;
   dust: number;
   voltage: number;
   current: number;
@@ -14,19 +16,25 @@ export interface DashboardDTO {
 
 /**
  * Transforms raw telemetry data from Firestore into DashboardDTO format.
- * Determines deviceStatus based on receivedAt timestamp (ONLINE if < 15 seconds, otherwise OFFLINE).
+ * Device status is resolved from the devices collection (set by MQTT solar/panel/status topic).
  */
-export function toDashboardDTO(telemetry: any): DashboardDTO {
-  const receivedAtTime = telemetry.receivedAt ? new Date(telemetry.receivedAt).getTime() : 0;
-  const now = new Date().getTime();
-
-  // Calculate if the device is ONLINE (receivedAt is within 15 seconds)
-  const deviceStatus = now - receivedAtTime < 15000 ? 'ONLINE' : 'OFFLINE';
+export async function toDashboardDTO(
+  telemetry: any,
+  deviceId: string = 'panel001',
+): Promise<DashboardDTO> {
+  // Read device status from Firestore (source of truth: ESP solar/panel/status topic)
+  let deviceStatus: 'ONLINE' | 'OFFLINE' = 'OFFLINE';
+  try {
+    deviceStatus = await DeviceRepository.getStatus(deviceId);
+  } catch {
+    // If device doc doesn't exist yet, default to OFFLINE
+    deviceStatus = 'OFFLINE';
+  }
 
   return {
     deviceStatus,
     temperature: telemetry.temperature ?? 0,
-    humidity: telemetry.humidity ?? 0,
+    airTemp: telemetry.airTemp ?? 0,
     dust: telemetry.dust ?? 0,
     voltage: telemetry.voltage ?? 0,
     current: telemetry.current ?? 0,

@@ -1,4 +1,4 @@
-import { env } from './config/env'; // Must be first to validate env vars
+import { env } from './config/env';
 import logger from './utils/logger';
 import app from './app';
 import { mqttClient } from './config/mqtt.config';
@@ -6,7 +6,6 @@ import { db } from './config/firebase';
 import { initializeMQTT } from './mqtt';
 import { initializeSocket } from './socket/socket.server';
 
-// Log status of Firebase initialization
 if (db) {
   logger.info('Firebase Firestore ready.');
 } else {
@@ -24,14 +23,12 @@ const server = app.listen(env.PORT, () => {
 
 initializeSocket(server);
 
-// Handle graceful shutdown and unhandled promise/exception situations
 const gracefulShutdown = (signal: string) => {
   logger.warn(`Received ${signal}. Shutting down server gracefully...`);
 
   server.close(() => {
     logger.info('HTTP server closed.');
 
-    // Close MQTT Client if connected
     if (mqttClient.connected) {
       logger.info('Closing MQTT Connection...');
       mqttClient.end(false, {}, () => {

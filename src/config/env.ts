@@ -36,12 +36,6 @@ const envSchema = z.object({
 
   // JWT Settings
   JWT_SECRET: z.string().min(8, 'JWT_SECRET must be at least 8 characters long'),
-
-  // Simulator Settings
-  ENABLE_SIMULATOR: z
-    .string()
-    .transform((val) => val === 'true')
-    .default('false'),
 });
 
 type EnvConfig = z.infer<typeof envSchema>;

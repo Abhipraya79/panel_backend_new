@@ -30,9 +30,9 @@ export const telemetryPayloadSchema = z.object({
       invalid_type_error: 'dust must be number',
     })
     .optional(),
-  humidity: z
+  airTemp: z
     .number({
-      invalid_type_error: 'humidity must be number',
+      invalid_type_error: 'airTemp must be number',
     })
     .optional(),
   pumpStatus: z
