@@ -23,6 +23,9 @@ const server = app.listen(env.PORT, () => {
 
 initializeSocket(server);
 
+import notificationScheduler from './scheduler/notification.scheduler';
+notificationScheduler.start();
+
 const gracefulShutdown = (signal: string) => {
   logger.warn(`Received ${signal}. Shutting down server gracefully...`);
 

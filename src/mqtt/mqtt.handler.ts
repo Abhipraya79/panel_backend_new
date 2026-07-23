@@ -7,6 +7,7 @@ import { getSocketIO } from '../socket/socket.server';
 import { SOCKET_EVENTS } from '../socket/socket.events';
 import { DeviceRepository } from '../repositories/device.repository';
 import { EventRepository } from '../repositories/event.repository';
+import temperatureMonitoringService from '../services/temperature-monitoring.service';
 
 export const handleMQTTMessage = async (topic: string, message: Buffer): Promise<void> => {
   const payloadStr = message.toString();
@@ -28,6 +29,8 @@ export const handleMQTTMessage = async (topic: string, message: Buffer): Promise
         logger.info(`[MQTT] Valid telemetry received for device: ${result.data.deviceId}`);
         // Forward to TelemetryService (emits Socket.IO + persists to Firestore)
         await TelemetryService.saveTelemetry(result.data, topic);
+        // Check for overheat
+        await temperatureMonitoringService.checkTemperature(result.data.deviceId, result.data.temperature);
       } else {
         const reasons = result.error.errors.map((err) => err.message);
         logger.warn(`[MQTT] Invalid telemetry payload: ${reasons.join(', ')}`);
@@ -88,7 +91,8 @@ export const handleMQTTMessage = async (topic: string, message: Buffer): Promise
         if (
           typeof result.data.event === 'string' &&
           (result.data.event.toLowerCase().includes('cleaning finished') ||
-           result.data.event.toLowerCase().includes('cleaning completed'))
+           result.data.event.toLowerCase().includes('cleaning completed') ||
+           result.data.event.toLowerCase().includes('cleaning cycle completed'))
         ) {
           logger.info('[MQTT] Cleaning completion detected via event feedback from ESP');
 
@@ -103,6 +107,23 @@ export const handleMQTTMessage = async (topic: string, message: Buffer): Promise
               `[SOCKET] Failed to emit cleaning status: ${socketError.message || socketError}`,
             );
           }
+          
+          import('../services/notification.service').then((ns) => {
+            const duration = result.data.duration ?? 0; // Use duration if sent, else 0
+            ns.default.sendCleaningFinished(duration, 'BERSIH');
+          }).catch((err) => {
+             logger.error(`[FCM] Failed to trigger notification service: ${err.message}`);
+          });
+
+        } else if (
+          typeof result.data.event === 'string' &&
+          result.data.event.toLowerCase().includes('cleaning started')
+        ) {
+           import('../services/notification.service').then((ns) => {
+            ns.default.sendCleaningStarted();
+          }).catch((err) => {
+             logger.error(`[FCM] Failed to trigger notification service: ${err.message}`);
+          });
         }
       } else {
         const reasons = result.error.errors.map((err) => err.message);

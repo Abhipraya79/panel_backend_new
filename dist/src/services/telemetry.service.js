@@ -24,6 +24,7 @@ class TelemetryService {
             pumpStatus: payload.pumpStatus,
             wiperStatus: payload.wiperStatus,
             mode: payload.mode,
+            timestamp: payload.timestamp || receivedAt,
             receivedAt,
         };
         // Update in-memory cache immediately for sub-millisecond REST API queries

@@ -18,6 +18,11 @@ export const eventPayloadSchema = z.object({
       invalid_type_error: 'timestamp must be string',
     })
     .optional(),
+  duration: z
+    .number({
+      invalid_type_error: 'duration must be number',
+    })
+    .optional(),
 });
 
 export type EventPayload = z.infer<typeof eventPayloadSchema>;

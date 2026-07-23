@@ -47,6 +47,15 @@ export class ControlService {
           reject(err);
         } else {
           logger.info(`[CONTROL] MQTT publish success\n\nTopic: ${CONTROL_TOPIC}`);
+          
+          if (action === 'START' && mode === 'AUTO_RTC') {
+            import('./notification.service').then((ns) => {
+              ns.default.sendAutoCleaningStartedNotification().catch((e) => {
+                logger.error(`[FCM] Failed to send auto cleaning started notification: ${e.message}`);
+              });
+            });
+          }
+
           resolve();
         }
       });

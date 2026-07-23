@@ -22,6 +22,7 @@ export class TelemetryService {
       pumpStatus: payload.pumpStatus,
       wiperStatus: payload.wiperStatus,
       mode: payload.mode,
+      timestamp: payload.timestamp || receivedAt,
       receivedAt,
     };
 
