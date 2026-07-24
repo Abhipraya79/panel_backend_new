@@ -9,7 +9,24 @@ class NotificationService {
     const MAX_RETRIES = 3;
 
     if (!tokens || tokens.length === 0) {
-      logger.warn('[FCM] No tokens provided for notification');
+      logger.info('[FCM] No individual tokens found in Firestore. Sending notification to topic "all"...');
+      try {
+        await messaging.send({
+          topic: 'all',
+          notification: payload.notification,
+          data: payload.data,
+          android: payload.android || {
+            priority: 'high',
+            notification: {
+              channelId: 'panel_care_notification',
+              sound: 'default',
+            },
+          },
+        });
+        logger.info('[FCM] Notification sent successfully via topic "all".');
+      } catch (err: any) {
+        logger.error(`[FCM] Failed to send via topic "all": ${err.message}`);
+      }
       return;
     }
 
@@ -113,11 +130,6 @@ class NotificationService {
    */
   async sendReminder10Minutes(): Promise<void> {
     const tokens = await this.getActiveTokens();
-    
-    if (tokens.length === 0) {
-      logger.info('[FCM] No active devices found to send 10 minute cleaning reminder.');
-      return;
-    }
 
     const payload = {
       notification: {
@@ -139,11 +151,6 @@ class NotificationService {
    */
   async sendReminder5Minutes(): Promise<void> {
     const tokens = await this.getActiveTokens();
-    
-    if (tokens.length === 0) {
-      logger.info('[FCM] No active devices found to send 5 minute cleaning warning.');
-      return;
-    }
 
     const payload = {
       notification: {
@@ -165,11 +172,6 @@ class NotificationService {
    */
   async sendAutoCleaningStartedNotification(): Promise<void> {
     const tokens = await this.getActiveTokens();
-    
-    if (tokens.length === 0) {
-      logger.info('[FCM]\nNo active devices found to send auto cleaning started notification.');
-      return;
-    }
 
     const payload = {
       notification: {
