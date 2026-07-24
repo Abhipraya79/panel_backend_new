@@ -268,7 +268,7 @@ class NotificationService {
   /**
    * Mengirim notifikasi suhu panel kembali normal
    */
-  async sendRecoveryNotification(temperature: number, deviceId: string): Promise<void> {
+  async sendRecoveryNotification(_temperature: number, deviceId: string): Promise<void> {
     const tokens = await this.getActiveTokens();
     
     if (tokens.length === 0) {

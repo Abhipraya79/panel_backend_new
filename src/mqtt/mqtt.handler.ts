@@ -120,7 +120,7 @@ export const handleMQTTMessage = async (topic: string, message: Buffer): Promise
           result.data.event.toLowerCase().includes('cleaning started')
         ) {
            import('../services/notification.service').then((ns) => {
-            ns.default.sendCleaningStarted();
+            ns.default.sendAutoCleaningStartedNotification();
           }).catch((err) => {
              logger.error(`[FCM] Failed to trigger notification service: ${err.message}`);
           });
