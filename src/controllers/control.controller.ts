@@ -136,3 +136,31 @@ export const postModeCommand = async (
     });
   }
 };
+
+export const testReminder10 = async (
+  _req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> => {
+  try {
+    const notificationService = (await import('../services/notification.service')).default;
+    await notificationService.sendReminder10Minutes();
+    res.status(200).json({ success: true, message: 'Test 10-minute reminder sent' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const testReminder5 = async (
+  _req: Request,
+  res: Response,
+  _next: NextFunction,
+): Promise<void> => {
+  try {
+    const notificationService = (await import('../services/notification.service')).default;
+    await notificationService.sendReminder5Minutes();
+    res.status(200).json({ success: true, message: 'Test 5-minute reminder sent' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
