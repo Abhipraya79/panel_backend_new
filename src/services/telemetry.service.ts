@@ -19,6 +19,7 @@ export class TelemetryService {
       power: payload.power,
       dust: payload.dust,
       airTemp: payload.airTemp,
+      pwm: payload.pwm,
       pumpStatus: payload.pumpStatus,
       wiperStatus: payload.wiperStatus,
       mode: payload.mode,

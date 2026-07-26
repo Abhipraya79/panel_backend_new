@@ -50,6 +50,14 @@ export const telemetryPayloadSchema = z.object({
       invalid_type_error: 'mode must be string',
     })
     .optional(),
+  pwm: z
+    .number({
+      invalid_type_error: 'pwm must be number',
+    })
+    .int('pwm must be an integer')
+    .min(0, 'pwm must be at least 0')
+    .max(255, 'pwm must be at most 255')
+    .optional(),
   timestamp: z
     .string({
       invalid_type_error: 'timestamp must be string',

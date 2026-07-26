@@ -8,6 +8,7 @@ export interface DashboardDTO {
   voltage: number;
   current: number;
   power: number;
+  pwm: number;
   pumpStatus: boolean;
   wiperStatus: boolean;
   mode: string;
@@ -39,6 +40,7 @@ export async function toDashboardDTO(
     voltage: telemetry.voltage ?? 0,
     current: telemetry.current ?? 0,
     power: telemetry.power ?? 0,
+    pwm: telemetry.pwm ?? 0,
     pumpStatus: telemetry.pumpStatus ?? false,
     wiperStatus: telemetry.wiperStatus ?? false,
     mode: telemetry.mode ?? 'UNKNOWN',
