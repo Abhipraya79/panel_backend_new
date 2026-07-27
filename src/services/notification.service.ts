@@ -2,12 +2,9 @@ import { messaging, db } from '../config/firebase';
 import logger from '../utils/logger';
 
 class NotificationService {
-  /**
-   * Mengirim notifikasi ke satu atau lebih token dengan mekanisme retry
-   */
+
   async sendNotification(tokens: string[], payload: any, retryCount = 0): Promise<void> {
     const MAX_RETRIES = 3;
-
     if (!tokens || tokens.length === 0) {
       logger.info('[FCM] No individual tokens found in Firestore. Sending notification to topic "all"...');
       try {
@@ -29,7 +26,6 @@ class NotificationService {
       }
       return;
     }
-
     try {
       const response = await messaging.sendEachForMulticast({
         tokens,
@@ -62,7 +58,6 @@ class NotificationService {
             ) {
               await this.removeInvalidToken(tokens[idx]);
             } else {
-              // Retry these tokens
               failedTokens.push(tokens[idx]);
             }
           }
@@ -84,9 +79,6 @@ class NotificationService {
     }
   }
 
-  /**
-   * Mengambil semua token aktif dari Firestore
-   */
   async getActiveTokens(): Promise<string[]> {
     try {
       const snapshot = await db.collection('devices').where('isActive', '==', true).get();
@@ -105,10 +97,6 @@ class NotificationService {
       return [];
     }
   }
-
-  /**
-   * Menghapus token yang invalid dari Firestore
-   */
   private async removeInvalidToken(token: string): Promise<void> {
     try {
       const snapshot = await db.collection('devices').where('fcmToken', '==', token).get();
