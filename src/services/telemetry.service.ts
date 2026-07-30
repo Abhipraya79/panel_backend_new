@@ -1,4 +1,4 @@
-import { TelemetryRepository } from '../repositories/telemetry.repository';
+import { TelemetryRepository, HistoryQueryParams, PaginatedHistoryResult } from '../repositories/telemetry.repository';
 import { TelemetryPayload } from '../validators/telemetry.validator';
 import { getSocketIO } from '../socket/socket.server';
 import { SOCKET_EVENTS } from '../socket/socket.events';
@@ -59,8 +59,24 @@ export class TelemetryService {
     return latestFromDb;
   }
 
+  /** Legacy — kept for backward compatibility */
   public static async getTelemetryHistory(page: number, limit: number): Promise<any[]> {
-    return await TelemetryRepository.getHistory(page, limit);
+    const result = await TelemetryRepository.getHistoryPaginated({ page, limit });
+    return result.data;
+  }
+
+  /**
+   * Paginated history with full filter support.
+   */
+  public static async getHistoryPaginated(params: HistoryQueryParams): Promise<PaginatedHistoryResult> {
+    return TelemetryRepository.getHistoryPaginated(params);
+  }
+
+  /**
+   * Fetch ALL records matching filter — used for server-side export.
+   */
+  public static async getAllForExport(params: Omit<HistoryQueryParams, 'page' | 'limit'>): Promise<any[]> {
+    return TelemetryRepository.getAllForExport(params);
   }
 
   public static async getDashboardData(deviceId: string = 'panel001'): Promise<DashboardDTO | null> {

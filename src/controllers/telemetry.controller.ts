@@ -33,28 +33,55 @@ export const getLatestTelemetry = async (
   }
 };
 
+/**
+ * GET /api/telemetry/history
+ *
+ * Query params:
+ *   page     : number (default 1)
+ *   limit    : number (default 50, max 200)
+ *   date     : 'today' | 'yesterday' | ISO date string (e.g. 2026-07-30) — defaults to 'today'
+ *   interval : '3s' | '5m' (default '3s')
+ *   search   : string — searches mode/deviceId
+ *   deviceId : string
+ *
+ * Response:
+ * {
+ *   success: true,
+ *   page, limit, totalPages, totalData,
+ *   data: [...]
+ * }
+ */
 export const getTelemetryHistory = async (
   req: Request,
   res: Response,
   _next: NextFunction,
 ): Promise<void> => {
   try {
-    logger.info('[REST API] GET History');
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const date = (req.query.date as string) || 'today';
+    const interval = ((req.query.interval as string) === '5m' ? '5m' : '3s') as '3s' | '5m';
+    const search = (req.query.search as string) || undefined;
+    const deviceId = (req.query.deviceId as string) || undefined;
 
-    // Parse query params
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    logger.info(`[REST API] GET History page=${page} limit=${limit} date=${date} interval=${interval}`);
 
-    const data = await TelemetryService.getTelemetryHistory(page, limit);
+    const result = await TelemetryService.getHistoryPaginated({
+      page,
+      limit,
+      date,
+      interval,
+      search,
+      deviceId,
+    });
 
     res.status(200).json({
       success: true,
-      message: 'Telemetry history retrieved successfully',
-      pagination: {
-        page,
-        limit,
-      },
-      data,
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages,
+      totalData: result.totalData,
+      data: result.data,
     });
   } catch (error: any) {
     logger.error('GET /api/telemetry/history - Error retrieving telemetry history', { error });
