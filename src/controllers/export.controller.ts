@@ -3,7 +3,20 @@ import { TelemetryService } from '../services/telemetry.service';
 import logger from '../utils/logger';
 import * as XLSX from 'xlsx';
 import PDFDocument from 'pdfkit';
-import { format as dateFormat } from 'date-fns';
+
+/** Native date formatter — avoids additional dependency */
+function dateFormat(d: Date, fmt: string): string {
+  const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return fmt
+    .replace('yyyy', String(d.getFullYear()))
+    .replace('dd', pad(d.getDate()))
+    .replace('MM', pad(d.getMonth() + 1))
+    .replace('MMM', months[d.getMonth()])
+    .replace('HH', pad(d.getHours()))
+    .replace('mm', pad(d.getMinutes()))
+    .replace('ss', pad(d.getSeconds()));
+}
 
 /**
  * Helper: format a number value safely
