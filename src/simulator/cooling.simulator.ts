@@ -2,6 +2,7 @@ import logger from '../utils/logger';
 import { getSocketIO } from '../socket/socket.server';
 import { SOCKET_EVENTS } from '../socket/socket.events';
 import { ControlRepository } from '../repositories/control.repository';
+import { EventRepository } from '../repositories/event.repository';
 
 const DEVICE_ID = 'panel001';
 
@@ -12,7 +13,7 @@ interface CoolingState {
   pwm_value: number;
 }
 
-let _state: CoolingState = {
+const _state: CoolingState = {
   isCooling: false,
   pwm_value: 0,
 };
@@ -33,13 +34,15 @@ function calculatePwmForTemp(temperature: number): number {
 
 /**
  * Set cooling state. Called from CoolingService when DEMO_MODE=true.
- * Emits cooling:update Socket.IO event immediately so Flutter gets it.
+ * Emits cooling:update Socket.IO event immediately so Flutter gets it,
+ * and records event to Firestore.
  */
 async function setCooling(start: boolean): Promise<void> {
   _state.isCooling = start;
-  _state.pwm_value = start ? 128 : 0; // start at midpoint, will drift with temperature
+  _state.pwm_value = start ? 128 : 0; // start at midpoint, will adjust with temperature
 
   const action = start ? 'START' : 'STOP';
+  const eventName = start ? 'Cooling cycle started' : 'Cooling cycle stopped';
 
   if (start) {
     logger.warn('[DEMO COOLING] Cooling STARTED');
@@ -50,7 +53,7 @@ async function setCooling(start: boolean): Promise<void> {
     logger.warn('[DEMO COOLING] PWM: 0');
   }
 
-  // Save to Firestore (same as real service)
+  // 1. Save command to Firestore control repository (same as real service)
   try {
     await ControlRepository.save({
       deviceId: DEVICE_ID,
@@ -61,10 +64,26 @@ async function setCooling(start: boolean): Promise<void> {
       source: 'flutter',
     });
   } catch (err: any) {
-    logger.error(`[DEMO COOLING] Firestore save error: ${err.message}`);
+    logger.error(`[DEMO COOLING] Firestore control save error: ${err.message}`);
   }
 
-  // Emit cooling:update — Flutter listens to this
+  // 2. Save event to Firestore events repository & emit event:new
+  try {
+    const eventPayload = {
+      deviceId: DEVICE_ID,
+      event: eventName,
+      timestamp: new Date().toISOString(),
+    };
+    await EventRepository.save(eventPayload);
+
+    const io = getSocketIO();
+    io.emit(SOCKET_EVENTS.EVENT_NEW, eventPayload);
+    logger.info(`[DEMO COOLING] Saved event & emitted ${SOCKET_EVENTS.EVENT_NEW} — ${eventName}`);
+  } catch (err: any) {
+    logger.error(`[DEMO COOLING] Firestore event save error: ${err.message}`);
+  }
+
+  // 3. Emit cooling:update — Flutter listens to this
   try {
     const io = getSocketIO();
     const socketPayload = {

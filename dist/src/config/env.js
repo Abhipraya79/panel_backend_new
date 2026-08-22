@@ -24,7 +24,7 @@ const envSchema = zod_1.z.object({
     DEMO_CLEANING_DURATION_MS: zod_1.z
         .string()
         .transform((val) => parseInt(val, 10))
-        .default('30000'),
+        .default('10000'),
     // MQTT Settings (required only when DEMO_MODE=false)
     MQTT_HOST: zod_1.z.string().default(''),
     MQTT_PORT: zod_1.z

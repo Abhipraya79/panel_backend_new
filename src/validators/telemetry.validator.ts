@@ -63,6 +63,17 @@ export const telemetryPayloadSchema = z.object({
       invalid_type_error: 'timestamp must be string',
     })
     .optional(),
+  source: z
+    .string({
+      invalid_type_error: 'source must be string',
+    })
+    .optional(),
+  isDemo: z
+    .boolean({
+      invalid_type_error: 'isDemo must be boolean',
+    })
+    .optional(),
 });
+
 
 export type TelemetryPayload = z.infer<typeof telemetryPayloadSchema>;

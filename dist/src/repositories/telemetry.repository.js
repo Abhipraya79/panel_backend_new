@@ -13,7 +13,8 @@ class TelemetryRepository {
             const docData = {
                 ...payload,
                 topic,
-                source,
+                source: payload.source || source,
+                isDemo: payload.isDemo ?? (source === 'demo'),
                 receivedAt: firebase_1.admin.firestore.FieldValue.serverTimestamp(),
             };
             const docRef = await collectionRef.add(docData);

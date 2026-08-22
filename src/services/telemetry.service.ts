@@ -29,7 +29,10 @@ export class TelemetryService {
       mode: payload.mode,
       timestamp: payload.timestamp || receivedAt,
       receivedAt,
+      source: payload.source || 'mqtt',
+      isDemo: payload.isDemo ?? (payload.source === 'demo'),
     };
+
 
     // Update in-memory cache immediately for sub-millisecond REST API queries
     TelemetryService.latestTelemetryCache.set(payload.deviceId || 'panel001', emitPayload);
@@ -48,11 +51,12 @@ export class TelemetryService {
 
     // 2. Persist to Firestore concurrently (non-blocking)
     try {
-      await TelemetryRepository.save(payload, topic, 'mqtt');
+      await TelemetryRepository.save(payload, topic, payload.source || 'mqtt');
     } catch (error: any) {
       logger.error(`[TELEMETRY] Firestore save error: ${error.message || error}`);
     }
   }
+
 
   public static async getLatestTelemetry(deviceId: string = 'panel001'): Promise<any | null> {
     if (TelemetryService.latestTelemetryCache.has(deviceId)) {

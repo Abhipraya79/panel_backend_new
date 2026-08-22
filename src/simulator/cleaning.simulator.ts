@@ -79,16 +79,24 @@ export async function startCleaning(): Promise<void> {
   logger.warn(`[DEMO MODE] Pump: ON | Wiper: ON`);
   logger.warn(`[DEMO MODE] Duration: ${durationMs}ms (${durationMs / 1000}s)`);
 
-  // Emit cleaning:update { status: 'running' } immediately
+  const startEventPayload = {
+    deviceId:  DEVICE_ID,
+    event:     'Cleaning cycle started',
+    timestamp: new Date().toISOString(),
+  };
+
+  // 1. Save start event to Firestore & emit Socket event
   try {
+    await EventRepository.save(startEventPayload);
     const io = getSocketIO();
+    io.emit(SOCKET_EVENTS.EVENT_NEW, startEventPayload);
     io.emit(SOCKET_EVENTS.CLEANING_UPDATE, { status: 'running' });
     logger.info(`[DEMO MODE] Emitted ${SOCKET_EVENTS.CLEANING_UPDATE} — running`);
   } catch (err: any) {
     logger.error(`[DEMO MODE] Error emitting cleaning start: ${err.message}`);
   }
 
-  // Schedule completion — Flutter knows cleaning is done via event:new, NOT a local timer in Flutter
+  // 2. Schedule completion
   _timerHolder.ref = setTimeout(() => {
     _finishCleaning().catch((err) => {
       logger.error(`[DEMO MODE] Error in cleaning finish: ${err.message}`);

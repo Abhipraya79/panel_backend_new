@@ -33,9 +33,11 @@ export class TelemetryRepository {
       const docData = {
         ...payload,
         topic,
-        source,
+        source: payload.source || source,
+        isDemo: payload.isDemo ?? (source === 'demo'),
         receivedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
+
 
       const docRef = await collectionRef.add(docData);
 

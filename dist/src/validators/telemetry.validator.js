@@ -65,4 +65,14 @@ exports.telemetryPayloadSchema = zod_1.z.object({
         invalid_type_error: 'timestamp must be string',
     })
         .optional(),
+    source: zod_1.z
+        .string({
+        invalid_type_error: 'source must be string',
+    })
+        .optional(),
+    isDemo: zod_1.z
+        .boolean({
+        invalid_type_error: 'isDemo must be boolean',
+    })
+        .optional(),
 });
