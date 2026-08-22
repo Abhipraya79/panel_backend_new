@@ -4,6 +4,8 @@ import { getSocketIO } from '../socket/socket.server';
 import { SOCKET_EVENTS } from '../socket/socket.events';
 import logger from '../utils/logger';
 import { CleaningCommandPayload } from '../validators/cleaning.validator';
+import { env } from '../config/env';
+
 
 const CONTROL_TOPIC = 'solar/panel/control';
 const DEVICE_ID = 'panel001';
@@ -29,7 +31,31 @@ export class ControlService {
   ): Promise<CleaningResult> {
     const { action, mode } = payload;
 
-    // MQTT payload — only action and mode as per ESP spec
+    // ─── DEMO MODE: skip MQTT, use simulator directly ──────────────────────
+    if (env.DEMO_MODE) {
+      logger.warn(`[DEMO MODE] Cleaning command received — action: ${action}, mode: ${mode}`);
+
+      if (action === 'START') {
+        // Lazy-import to avoid circular dependency issues
+        const { cleaningSimulator } = await import('../simulator');
+        await cleaningSimulator.startCleaning();
+      }
+
+      // Still save to Firestore
+      await ControlRepository.save({
+        deviceId: DEVICE_ID,
+        action,
+        mode,
+        topic: CONTROL_TOPIC,
+        status: 'DEMO_SIMULATED',
+        source: 'flutter',
+      });
+
+      // Emit cleaning:update { status: 'running' } — already done in cleaningSimulator
+      return { mqtt: 'DEMO_SKIP', firestore: 'SAVED' };
+    }
+
+    // ─── REAL MODE: publish to MQTT ───────────────────────────────────────────
     const mqttPayload = {
       action,
       mode,
@@ -105,6 +131,26 @@ export class ControlService {
       mode,
     };
 
+    // ─── DEMO MODE: skip MQTT, update simulator state ─────────────────────────
+    if (env.DEMO_MODE) {
+      logger.warn(`[DEMO MODE] Mode command received — mode: ${mode}`);
+
+      const { setSimulatorMode } = await import('../simulator');
+      setSimulatorMode(mode as 'MANUAL' | 'AUTO');
+
+      await ControlRepository.save({
+        deviceId: DEVICE_ID,
+        action: 'SET_MODE',
+        mode,
+        topic: CONTROL_TOPIC,
+        status: 'DEMO_SIMULATED',
+        source: 'flutter',
+      });
+
+      return { mqtt: 'DEMO_SKIP', firestore: 'SAVED' };
+    }
+
+    // ─── REAL MODE: publish to MQTT ───────────────────────────────────────────
     // 1. Publish to MQTT
     logger.info(
       `[CONTROL] Mode MQTT publish started\n\nTopic: ${CONTROL_TOPIC}\n\nPayload:\n${JSON.stringify(mqttPayload, null, 2)}`,

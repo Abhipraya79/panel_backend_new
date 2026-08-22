@@ -4,6 +4,8 @@ import { getSocketIO } from '../socket/socket.server';
 import { SOCKET_EVENTS } from '../socket/socket.events';
 import logger from '../utils/logger';
 import { CoolingCommandPayload } from '../validators/cooling.validator';
+import { env } from '../config/env';
+
 
 const COOLING_TOPIC = 'solar/panel/control/cooling';
 const DEVICE_ID = 'panel001';
@@ -20,6 +22,17 @@ export class CoolingService {
     const { action } = payload;
     const isStart = action === 'START';
 
+    // ─── DEMO MODE: skip MQTT, use cooling simulator directly ────────────────
+    if (env.DEMO_MODE) {
+      logger.warn(`[DEMO MODE] Cooling command received — action: ${action}`);
+
+      const { coolingSimulator } = await import('../simulator');
+      await coolingSimulator.setCooling(isStart);
+
+      return { mqtt: 'DEMO_SKIP', firestore: 'SAVED' };
+    }
+
+    // ─── REAL MODE: publish to MQTT ───────────────────────────────────────────
     // MQTT payload — only action as per ESP spec
     const mqttPayload = {
       action,

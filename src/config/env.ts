@@ -12,8 +12,20 @@ const envSchema = z.object({
     .default('5000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
-  // MQTT Settings
-  MQTT_HOST: z.string().min(1, 'MQTT_HOST is required'),
+  // Demo Mode — set DEMO_MODE=true to use dummy telemetry (no ESP/MQTT required)
+  DEMO_MODE: z
+    .string()
+    .transform((val) => val.toLowerCase() === 'true')
+    .default('false'),
+
+  // Cleaning simulation duration in milliseconds (only used when DEMO_MODE=true)
+  DEMO_CLEANING_DURATION_MS: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .default('30000'),
+
+  // MQTT Settings (required only when DEMO_MODE=false)
+  MQTT_HOST: z.string().default(''),
   MQTT_PORT: z
     .string()
     .transform((val) => parseInt(val, 10))

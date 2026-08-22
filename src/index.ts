@@ -6,15 +6,11 @@ import { db } from './config/firebase';
 import { initializeMQTT } from './mqtt';
 import { initializeSocket } from './socket/socket.server';
 
+
 if (db) {
   logger.info('Firebase Firestore ready.');
 } else {
   logger.warn('Firebase services are bypassed or failed initialization.');
-}
-
-if (mqttClient) {
-  logger.info('MQTT client instance instantiated.');
-  initializeMQTT();
 }
 
 const server = app.listen(env.PORT, () => {
@@ -22,6 +18,22 @@ const server = app.listen(env.PORT, () => {
 });
 
 initializeSocket(server);
+
+// ─── DEMO MODE vs REAL MODE ───────────────────────────────────────────────────
+if (env.DEMO_MODE) {
+  // DEMO: Start dummy telemetry simulator — no MQTT/HiveMQ connection
+  import('./simulator').then(({ startSimulator }) => {
+    startSimulator();
+  }).catch((err) => {
+    logger.error('[DEMO MODE] Failed to start simulator', { err });
+  });
+} else {
+  // REAL: Connect to MQTT/HiveMQ and subscribe to topics
+  if (mqttClient && !env.DEMO_MODE) {
+    logger.info('MQTT client instance instantiated.');
+    initializeMQTT();
+  }
+}
 
 import notificationScheduler from './scheduler/notification.scheduler';
 notificationScheduler.start();
@@ -32,13 +44,18 @@ const gracefulShutdown = (signal: string) => {
   server.close(() => {
     logger.info('HTTP server closed.');
 
-    if (mqttClient.connected) {
+    // Only close MQTT in REAL mode
+    if (!env.DEMO_MODE && mqttClient.connected) {
       logger.info('Closing MQTT Connection...');
       mqttClient.end(false, {}, () => {
         logger.info('MQTT Connection closed.');
         process.exit(0);
       });
     } else {
+      // DEMO MODE: also stop simulator
+      if (env.DEMO_MODE) {
+        import('./simulator').then(({ stopSimulator }) => stopSimulator()).catch(() => {});
+      }
       process.exit(0);
     }
   });
@@ -49,6 +66,7 @@ const gracefulShutdown = (signal: string) => {
     process.exit(1);
   }, 10000);
 };
+
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));

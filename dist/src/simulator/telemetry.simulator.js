@@ -3,65 +3,115 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.stopTelemetrySimulator = exports.startTelemetrySimulator = void 0;
-const mqtt_config_1 = require("../config/mqtt.config");
+exports.simulatorState = void 0;
+exports.startTelemetrySimulator = startTelemetrySimulator;
+exports.stopTelemetrySimulator = stopTelemetrySimulator;
+exports.setSimulatorMode = setSimulatorMode;
 const logger_1 = __importDefault(require("../utils/logger"));
-let intervalId = null;
-/**
- * Generates a random number between min and max with the specified decimal places.
- */
-const randomBetween = (min, max, decimals = 2) => {
-    const rand = Math.random() * (max - min) + min;
-    const powerVal = Math.pow(10, decimals);
-    return Math.round(rand * powerVal) / powerVal;
+const telemetry_service_1 = require("../services/telemetry.service");
+const temperature_monitoring_service_1 = __importDefault(require("../services/temperature-monitoring.service"));
+const cleaning_simulator_1 = require("./cleaning.simulator");
+const cooling_simulator_1 = require("./cooling.simulator");
+const DEVICE_ID = 'panel001';
+const TOPIC = 'solar/panel/telemetry';
+const INTERVAL_MS = 3000; // 3 seconds — same as real system
+const state = {
+    temperature: 30.81,
+    voltage: 12.0,
+    current: 2.0,
+    dust: 13.2,
+    airTemp: 30.31,
+    mode: 'MANUAL',
 };
-/**
- * Starts the telemetry simulator, publishing to MQTT every 5 seconds.
- */
-const startTelemetrySimulator = () => {
-    if (intervalId) {
-        logger_1.default.warn('[SIMULATOR] Simulator is already running.');
+exports.simulatorState = state;
+// ─── Tiny random drift helper ─────────────────────────────────────────────────
+// Returns a small delta that keeps value realistic (no wild jumps)
+function drift(value, max, min, step) {
+    const delta = (Math.random() - 0.5) * 2 * step;
+    return Math.min(max, Math.max(min, parseFloat((value + delta).toFixed(2))));
+}
+// ─── Build Telemetry Payload ──────────────────────────────────────────────────
+function buildPayload() {
+    // Drift all sensor values realistically
+    state.temperature = drift(state.temperature, 50.0, 25.0, 0.08);
+    state.voltage = drift(state.voltage, 14.0, 10.5, 0.03);
+    state.current = drift(state.current, 4.0, 0.5, 0.03);
+    state.dust = drift(state.dust, 120.0, 5.0, 0.15);
+    state.airTemp = drift(state.airTemp, 40.0, 20.0, 0.05);
+    // Power must be consistent: P ≈ V × I (rounded to 2 decimal)
+    const power = parseFloat((state.voltage * state.current).toFixed(2));
+    // Get actuator states from simulators
+    const cleaningState = cleaning_simulator_1.cleaningSimulator.getState();
+    const coolingState = cooling_simulator_1.coolingSimulator.getState();
+    // PWM is driven by cooling simulator
+    // If manually cooling is OFF, PWM reflects temperature-based auto calculation
+    const pwm = coolingState.isCooling
+        ? cooling_simulator_1.coolingSimulator.calculatePwmForTemp(state.temperature)
+        : 0;
+    const payload = {
+        deviceId: DEVICE_ID,
+        temperature: state.temperature,
+        voltage: state.voltage,
+        current: state.current,
+        power,
+        dust: state.dust,
+        airTemp: state.airTemp,
+        pwm_value: pwm,
+        pumpStatus: cleaningState.pumpStatus,
+        wiperStatus: cleaningState.wiperStatus,
+        mode: state.mode,
+        timestamp: new Date().toISOString(),
+    };
+    return payload;
+}
+// ─── Timer ────────────────────────────────────────────────────────────────────
+let _timer = null;
+async function tick() {
+    try {
+        const payload = buildPayload();
+        logger_1.default.info(`[DEMO MODE] Generating telemetry for ${DEVICE_ID}\n` +
+            `  Temperature : ${payload.temperature}°C\n` +
+            `  Voltage     : ${payload.voltage} V\n` +
+            `  Current     : ${payload.current} A\n` +
+            `  Power       : ${payload.power} W\n` +
+            `  Dust        : ${payload.dust} μg/m³\n` +
+            `  Air Temp    : ${payload.airTemp}°C\n` +
+            `  PWM         : ${payload.pwm_value}\n` +
+            `  Pump        : ${payload.pumpStatus ? 'ON' : 'OFF'}\n` +
+            `  Wiper       : ${payload.wiperStatus ? 'ON' : 'OFF'}\n` +
+            `  Mode        : ${payload.mode}`);
+        // Route through EXACT same pipeline as real MQTT
+        await telemetry_service_1.TelemetryService.saveTelemetry(payload, TOPIC);
+        // Temperature monitoring — same as real MQTT handler
+        await temperature_monitoring_service_1.default.checkTemperature(DEVICE_ID, payload.temperature);
+    }
+    catch (err) {
+        logger_1.default.error(`[DEMO MODE] Telemetry generation error: ${err.message}`);
+    }
+}
+// ─── Public API ───────────────────────────────────────────────────────────────
+function startTelemetrySimulator() {
+    if (_timer !== null) {
+        logger_1.default.warn('[DEMO MODE] Telemetry simulator already running — skipping duplicate start');
         return;
     }
-    logger_1.default.info('[SIMULATOR] Starting telemetry simulator...');
-    intervalId = setInterval(() => {
-        // Generate payload
-        const voltage = randomBetween(17.5, 19);
-        const current = randomBetween(2, 3);
-        const power = Math.round(voltage * current * 100) / 100;
-        const payload = {
-            deviceId: 'panel001',
-            temperature: randomBetween(35, 45),
-            voltage,
-            current,
-            power,
-            dust: randomBetween(0, 100),
-            humidity: randomBetween(60, 90),
-            pumpStatus: Math.random() > 0.5,
-            wiperStatus: Math.random() > 0.5,
-            mode: 'AUTO',
-            timestamp: new Date().toISOString(),
-        };
-        const topic = 'solar/panel/telemetry';
-        // Logging formatted per instructions
-        logger_1.default.info(`[SIMULATOR]\nPublishing telemetry\nTopic: ${topic}\nPayload:\n${JSON.stringify(payload, null, 2)}`);
-        // Publish to the HiveMQ Cloud MQTT broker
-        mqtt_config_1.mqttClient.publish(topic, JSON.stringify(payload), { qos: 1 }, (err) => {
-            if (err) {
-                logger_1.default.error(`[SIMULATOR] Failed to publish telemetry: ${err.message}`, { err });
-            }
-        });
-    }, 5000);
-};
-exports.startTelemetrySimulator = startTelemetrySimulator;
-/**
- * Stops the telemetry simulator.
- */
-const stopTelemetrySimulator = () => {
-    if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-        logger_1.default.info('[SIMULATOR] Telemetry simulator stopped.');
+    logger_1.default.warn(`[DEMO MODE] Dummy telemetry generator started`);
+    logger_1.default.warn(`[DEMO MODE] Interval: ${INTERVAL_MS}ms (${INTERVAL_MS / 1000}s)`);
+    logger_1.default.warn(`[DEMO MODE] Device  : ${DEVICE_ID}`);
+    // Run first tick immediately so dashboard isn't blank on startup
+    tick();
+    _timer = setInterval(() => {
+        tick();
+    }, INTERVAL_MS);
+}
+function stopTelemetrySimulator() {
+    if (_timer !== null) {
+        clearInterval(_timer);
+        _timer = null;
+        logger_1.default.warn('[DEMO MODE] Telemetry simulator stopped');
     }
-};
-exports.stopTelemetrySimulator = stopTelemetrySimulator;
+}
+function setSimulatorMode(mode) {
+    state.mode = mode;
+    logger_1.default.info(`[DEMO MODE] Mode changed to: ${mode}`);
+}
