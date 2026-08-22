@@ -10,7 +10,7 @@ import { startTelemetrySimulator, stopTelemetrySimulator } from './telemetry.sim
 export function startSimulator(): void {
   logger.warn('═══════════════════════════════════════════════════════');
   logger.warn('[DEMO MODE] ⚠️  DEMO MODE IS ACTIVE');
-  logger.warn('[DEMO MODE] Dummy Telemetry Generator started');
+  logger.warn('[DEMO MODE] Time-based Solar Telemetry Generator started');
   logger.warn('[DEMO MODE] MQTT/HiveMQ is DISABLED in this mode');
   logger.warn('[DEMO MODE] All data is simulated — no ESP required');
   logger.warn('[DEMO MODE] To switch to real mode: set DEMO_MODE=false');
@@ -24,7 +24,8 @@ export function stopSimulator(): void {
   logger.warn('[DEMO MODE] Simulator stopped');
 }
 
-// Re-export simulators so services can import them
+// Re-export simulators so services and routes can import them
 export { cleaningSimulator } from './cleaning.simulator';
 export { coolingSimulator }  from './cooling.simulator';
 export { setSimulatorMode }  from './telemetry.simulator';
+export { solarTimeEngine }   from './solar-time.engine';

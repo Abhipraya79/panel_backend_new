@@ -18,6 +18,26 @@ const envSchema = z.object({
     .transform((val) => val.toLowerCase() === 'true')
     .default('false'),
 
+  // Simulation Time Configuration
+  SIMULATION_TIME_MODE: z
+    .enum(['REAL_TIME', 'FIXED', 'ACCELERATED'])
+    .default('REAL_TIME'),
+  SIMULATION_START_TIME: z.string().default('11:00'),
+  SIMULATION_END_TIME: z.string().default('13:00'),
+  SIMULATION_TIME: z.string().optional(),
+  SIMULATION_SPEED: z
+    .string()
+    .transform((val) => parseFloat(val))
+    .default('1'),
+  TEMPERATURE_MIN: z
+    .string()
+    .transform((val) => parseFloat(val))
+    .default('40'),
+  TEMPERATURE_MAX: z
+    .string()
+    .transform((val) => parseFloat(val))
+    .default('60'),
+
   // Cleaning simulation duration in milliseconds (only used when DEMO_MODE=true)
   DEMO_CLEANING_DURATION_MS: z
     .string()
