@@ -20,4 +20,9 @@ exports.eventPayloadSchema = zod_1.z.object({
         invalid_type_error: 'timestamp must be string',
     })
         .optional(),
+    duration: zod_1.z
+        .number({
+        invalid_type_error: 'duration must be number',
+    })
+        .optional(),
 });

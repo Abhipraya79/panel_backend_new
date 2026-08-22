@@ -37,6 +37,15 @@ const envSchema = zod_1.z.object({
     }),
     // JWT Settings
     JWT_SECRET: zod_1.z.string().min(8, 'JWT_SECRET must be at least 8 characters long'),
+    // Settings
+    PANEL_OVERHEAT_TEMP: zod_1.z
+        .string()
+        .transform((val) => parseInt(val, 10))
+        .default('45'),
+    PANEL_RECOVERY_TEMP: zod_1.z
+        .string()
+        .transform((val) => parseInt(val, 10))
+        .default('42'),
 });
 let env;
 try {

@@ -24,6 +24,8 @@ const server = app_1.default.listen(env_1.env.PORT, () => {
     logger_1.default.info(`🚀 Server running in [${env_1.env.NODE_ENV}] mode on port ${env_1.env.PORT}`);
 });
 (0, socket_server_1.initializeSocket)(server);
+const notification_scheduler_1 = __importDefault(require("./scheduler/notification.scheduler"));
+notification_scheduler_1.default.start();
 const gracefulShutdown = (signal) => {
     logger_1.default.warn(`Received ${signal}. Shutting down server gracefully...`);
     server.close(() => {

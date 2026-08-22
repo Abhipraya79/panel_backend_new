@@ -7,7 +7,20 @@ import PDFDocument from 'pdfkit';
 /** Native date formatter — avoids additional dependency */
 function dateFormat(d: Date, fmt: string): string {
   const pad = (n: number, len = 2) => String(n).padStart(len, '0');
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
   return fmt
     .replace('yyyy', String(d.getFullYear()))
     .replace('dd', pad(d.getDate()))
@@ -61,46 +74,71 @@ export const exportExcel = async (req: Request, res: Response): Promise<void> =>
 
     logger.info(`[EXPORT] Excel request — date=${date} interval=${interval}`);
 
-    const records = await TelemetryService.getAllForExport({ date, interval, deviceId, search });
-
     const workbook = XLSX.utils.book_new();
 
     // Header row
     const headers = [
-      'No', 'Tanggal', 'Jam', 'Suhu Panel (°C)', 'Suhu Air (°C)',
-      'Tegangan (V)', 'Arus (A)', 'Daya (W)', 'Debu', 'PWM Value',
-      'Cooling', 'Cleaning', 'Mode', 'Status', 'Device ID',
+      'No',
+      'Tanggal',
+      'Jam',
+      'Suhu Panel (°C)',
+      'Suhu Air (°C)',
+      'Tegangan (V)',
+      'Arus (A)',
+      'Daya (W)',
+      'Debu',
+      'PWM Value',
+      'Cooling',
+      'Cleaning',
+      'Mode',
+      'Status',
+      'Device ID',
     ];
 
     const rows: any[][] = [headers];
-    records.forEach((r, i) => {
-      const ts = formatTimestamp(r.receivedAt ?? r.timestamp);
-      rows.push([
-        i + 1,
-        dateFormat(ts, 'dd MMM yyyy'),
-        dateFormat(ts, 'HH:mm:ss'),
-        parseFloat(fmt(r.temperature)),
-        parseFloat(fmt(r.airTemp)),
-        parseFloat(fmt(r.voltage)),
-        parseFloat(fmt(r.current)),
-        parseFloat(fmt(r.power)),
-        parseFloat(fmt(r.dust)),
-        parseInt(r.pwm_value ?? r.pwmValue ?? 0),
-        boolStr(r.pumpStatus ?? r.pump),
-        boolStr(r.wiperStatus ?? r.wiper),
-        modeStr(r.mode ?? r.systemMode),
-        String(r.status ?? r.deviceStatus ?? 'ONLINE').toUpperCase(),
-        String(r.deviceId ?? 'panel001'),
-      ]);
-    });
+    const totalRecords = await TelemetryService.forEachExportRecord(
+      { date, interval, deviceId, search },
+      async (r, i) => {
+        const ts = formatTimestamp(r.receivedAt ?? r.timestamp);
+        rows.push([
+          i + 1,
+          dateFormat(ts, 'dd MMM yyyy'),
+          dateFormat(ts, 'HH:mm:ss'),
+          parseFloat(fmt(r.temperature)),
+          parseFloat(fmt(r.airTemp)),
+          parseFloat(fmt(r.voltage)),
+          parseFloat(fmt(r.current)),
+          parseFloat(fmt(r.power)),
+          parseFloat(fmt(r.dust)),
+          parseInt(r.pwm_value ?? r.pwmValue ?? 0),
+          boolStr(r.pumpStatus ?? r.pump),
+          boolStr(r.wiperStatus ?? r.wiper),
+          modeStr(r.mode ?? r.systemMode),
+          String(r.status ?? r.deviceStatus ?? 'ONLINE').toUpperCase(),
+          String(r.deviceId ?? 'panel001'),
+        ]);
+      },
+    );
 
     const worksheet = XLSX.utils.aoa_to_sheet(rows);
 
     // Column widths
     worksheet['!cols'] = [
-      { wch: 5 }, { wch: 16 }, { wch: 10 }, { wch: 15 }, { wch: 13 },
-      { wch: 13 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 10 },
-      { wch: 9 }, { wch: 10 }, { wch: 9 }, { wch: 9 }, { wch: 12 },
+      { wch: 5 },
+      { wch: 16 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 13 },
+      { wch: 13 },
+      { wch: 10 },
+      { wch: 10 },
+      { wch: 8 },
+      { wch: 10 },
+      { wch: 9 },
+      { wch: 10 },
+      { wch: 9 },
+      { wch: 9 },
+      { wch: 12 },
     ];
 
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Monitoring');
@@ -108,12 +146,15 @@ export const exportExcel = async (req: Request, res: Response): Promise<void> =>
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     const filename = `PanelCare_${date}_${interval}_${Date.now()}.xlsx`;
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('X-Total-Records', records.length.toString());
+    res.setHeader('X-Total-Records', totalRecords.toString());
     res.send(buffer);
 
-    logger.info(`[EXPORT] Excel sent: ${records.length} rows, filename=${filename}`);
+    logger.info(`[EXPORT] Excel sent: ${totalRecords} rows, filename=${filename}`);
   } catch (error: any) {
     logger.error('[EXPORT] Excel export failed', { error });
     res.status(500).json({ success: false, message: error.message || 'Export failed' });
@@ -134,28 +175,29 @@ export const exportPdf = async (req: Request, res: Response): Promise<void> => {
 
     logger.info(`[EXPORT] PDF request — date=${date} interval=${interval}`);
 
-    const records = await TelemetryService.getAllForExport({ date, interval, deviceId, search });
-
     const filename = `PanelCare_${date}_${interval}_${Date.now()}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('X-Total-Records', records.length.toString());
 
     const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
     doc.pipe(res);
 
     // ── Title
-    doc.fontSize(14).font('Helvetica-Bold').text('Laporan Monitoring Panel Surya', { align: 'center' });
-    doc.fontSize(10).font('Helvetica').text(
-      `Tanggal: ${date} | Interval: ${interval === '5m' ? '5 Menit' : '3 Detik'} | Total Data: ${records.length}`,
-      { align: 'center' },
-    );
+    doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Laporan Monitoring Panel Surya', { align: 'center' });
+    doc
+      .fontSize(10)
+      .font('Helvetica')
+      .text(`Tanggal: ${date} | Interval: ${interval === '5m' ? '5 Menit' : '3 Detik'}`, {
+        align: 'center',
+      });
     doc.moveDown(0.5);
-    doc.fontSize(9).text(
-      `Digenerate: ${dateFormat(new Date(), 'dd MMM yyyy HH:mm:ss')}`,
-      { align: 'right' },
-    );
+    doc
+      .fontSize(9)
+      .text(`Digenerate: ${dateFormat(new Date(), 'dd MMM yyyy HH:mm:ss')}`, { align: 'right' });
     doc.moveDown(1);
 
     // ── Table setup
@@ -209,39 +251,42 @@ export const exportPdf = async (req: Request, res: Response): Promise<void> => {
     currentY += headerH;
 
     // Draw rows — paginate if needed
-    records.forEach((r, i) => {
-      if (currentY + rowH > doc.page.height - doc.page.margins.bottom - 20) {
-        doc.addPage();
-        currentY = doc.page.margins.top;
-        // Re-draw header on new page
-        drawRow(currentY, headers, true);
-        currentY += headerH;
-      }
+    const totalRecords = await TelemetryService.forEachExportRecord(
+      { date, interval, deviceId, search },
+      async (r, i) => {
+        if (currentY + rowH > doc.page.height - doc.page.margins.bottom - 20) {
+          doc.addPage();
+          currentY = doc.page.margins.top;
+          // Re-draw header on new page
+          drawRow(currentY, headers, true);
+          currentY += headerH;
+        }
 
-      const ts = formatTimestamp(r.receivedAt ?? r.timestamp);
-      const values = [
-        String(i + 1),
-        dateFormat(ts, 'dd/MM/yyyy'),
-        dateFormat(ts, 'HH:mm:ss'),
-        fmt(r.temperature),
-        fmt(r.airTemp),
-        fmt(r.voltage),
-        fmt(r.current),
-        fmt(r.power),
-        fmt(r.dust),
-        String(r.pwm_value ?? r.pwmValue ?? 0),
-        boolStr(r.pumpStatus ?? r.pump),
-        boolStr(r.wiperStatus ?? r.wiper),
-        modeStr(r.mode ?? r.systemMode),
-        String(r.status ?? r.deviceStatus ?? 'ONLINE').toUpperCase(),
-      ];
+        const ts = formatTimestamp(r.receivedAt ?? r.timestamp);
+        const values = [
+          String(i + 1),
+          dateFormat(ts, 'dd/MM/yyyy'),
+          dateFormat(ts, 'HH:mm:ss'),
+          fmt(r.temperature),
+          fmt(r.airTemp),
+          fmt(r.voltage),
+          fmt(r.current),
+          fmt(r.power),
+          fmt(r.dust),
+          String(r.pwm_value ?? r.pwmValue ?? 0),
+          boolStr(r.pumpStatus ?? r.pump),
+          boolStr(r.wiperStatus ?? r.wiper),
+          modeStr(r.mode ?? r.systemMode),
+          String(r.status ?? r.deviceStatus ?? 'ONLINE').toUpperCase(),
+        ];
 
-      drawRow(currentY, values, false);
-      currentY += rowH;
-    });
+        drawRow(currentY, values, false);
+        currentY += rowH;
+      },
+    );
 
     doc.end();
-    logger.info(`[EXPORT] PDF sent: ${records.length} rows, filename=${filename}`);
+    logger.info(`[EXPORT] PDF sent: ${totalRecords} rows, filename=${filename}`);
   } catch (error: any) {
     logger.error('[EXPORT] PDF export failed', { error });
     if (!res.headersSent) {

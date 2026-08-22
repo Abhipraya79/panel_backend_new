@@ -1,4 +1,8 @@
-import { TelemetryRepository, HistoryQueryParams, PaginatedHistoryResult } from '../repositories/telemetry.repository';
+import {
+  TelemetryRepository,
+  HistoryQueryParams,
+  PaginatedHistoryResult,
+} from '../repositories/telemetry.repository';
 import { TelemetryPayload } from '../validators/telemetry.validator';
 import { getSocketIO } from '../socket/socket.server';
 import { SOCKET_EVENTS } from '../socket/socket.events';
@@ -35,7 +39,9 @@ export class TelemetryService {
       const io = getSocketIO();
       io.emit(SOCKET_EVENTS.TELEMETRY_UPDATE, emitPayload);
       const clientCount = io.sockets.sockets.size;
-      logger.info(`[SOCKET] Realtime telemetry emitted to ${clientCount} clients (${payload.deviceId})`);
+      logger.info(
+        `[SOCKET] Realtime telemetry emitted to ${clientCount} clients (${payload.deviceId})`,
+      );
     } catch (error: any) {
       logger.error(`[SOCKET] Failed to emit telemetry: ${error.message || error}`);
     }
@@ -68,18 +74,32 @@ export class TelemetryService {
   /**
    * Paginated history with full filter support.
    */
-  public static async getHistoryPaginated(params: HistoryQueryParams): Promise<PaginatedHistoryResult> {
+  public static async getHistoryPaginated(
+    params: HistoryQueryParams,
+  ): Promise<PaginatedHistoryResult> {
     return TelemetryRepository.getHistoryPaginated(params);
   }
 
   /**
    * Fetch ALL records matching filter — used for server-side export.
    */
-  public static async getAllForExport(params: Omit<HistoryQueryParams, 'page' | 'limit'>): Promise<any[]> {
+  public static async getAllForExport(
+    params: Omit<HistoryQueryParams, 'page' | 'limit'>,
+  ): Promise<any[]> {
     return TelemetryRepository.getAllForExport(params);
   }
 
-  public static async getDashboardData(deviceId: string = 'panel001'): Promise<DashboardDTO | null> {
+  public static async forEachExportRecord(
+    params: Omit<HistoryQueryParams, 'page' | 'limit'>,
+    onRecord: (record: any, index: number) => void | Promise<void>,
+    batchSize?: number,
+  ): Promise<number> {
+    return TelemetryRepository.forEachExportRecord(params, onRecord, batchSize);
+  }
+
+  public static async getDashboardData(
+    deviceId: string = 'panel001',
+  ): Promise<DashboardDTO | null> {
     const latest = await TelemetryService.getLatestTelemetry(deviceId);
     if (!latest) {
       return null;

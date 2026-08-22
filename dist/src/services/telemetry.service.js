@@ -21,6 +21,7 @@ class TelemetryService {
             power: payload.power,
             dust: payload.dust,
             airTemp: payload.airTemp,
+            pwm_value: payload.pwm_value,
             pumpStatus: payload.pumpStatus,
             wiperStatus: payload.wiperStatus,
             mode: payload.mode,
@@ -57,8 +58,25 @@ class TelemetryService {
         }
         return latestFromDb;
     }
+    /** Legacy — kept for backward compatibility */
     static async getTelemetryHistory(page, limit) {
-        return await telemetry_repository_1.TelemetryRepository.getHistory(page, limit);
+        const result = await telemetry_repository_1.TelemetryRepository.getHistoryPaginated({ page, limit });
+        return result.data;
+    }
+    /**
+     * Paginated history with full filter support.
+     */
+    static async getHistoryPaginated(params) {
+        return telemetry_repository_1.TelemetryRepository.getHistoryPaginated(params);
+    }
+    /**
+     * Fetch ALL records matching filter — used for server-side export.
+     */
+    static async getAllForExport(params) {
+        return telemetry_repository_1.TelemetryRepository.getAllForExport(params);
+    }
+    static async forEachExportRecord(params, onRecord, batchSize) {
+        return telemetry_repository_1.TelemetryRepository.forEachExportRecord(params, onRecord, batchSize);
     }
     static async getDashboardData(deviceId = 'panel001') {
         const latest = await TelemetryService.getLatestTelemetry(deviceId);

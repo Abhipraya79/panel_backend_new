@@ -39,6 +39,7 @@ export const getLatestTelemetry = async (
  * Query params:
  *   page     : number (default 1)
  *   limit    : number (default 50, max 200)
+ *   cursor   : string returned by the previous response
  *   date     : 'today' | 'yesterday' | ISO date string (e.g. 2026-07-30) — defaults to 'today'
  *   interval : '3s' | '5m' (default '3s')
  *   search   : string — searches mode/deviceId
@@ -59,16 +60,20 @@ export const getTelemetryHistory = async (
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const cursor = (req.query.cursor as string) || undefined;
     const date = (req.query.date as string) || 'today';
     const interval = ((req.query.interval as string) === '5m' ? '5m' : '3s') as '3s' | '5m';
     const search = (req.query.search as string) || undefined;
     const deviceId = (req.query.deviceId as string) || undefined;
 
-    logger.info(`[REST API] GET History page=${page} limit=${limit} date=${date} interval=${interval}`);
+    logger.info(
+      `[REST API] GET History page=${page} limit=${limit} date=${date} interval=${interval}`,
+    );
 
     const result = await TelemetryService.getHistoryPaginated({
       page,
       limit,
+      cursor,
       date,
       interval,
       search,
@@ -81,6 +86,7 @@ export const getTelemetryHistory = async (
       limit: result.limit,
       totalPages: result.totalPages,
       totalData: result.totalData,
+      nextCursor: result.nextCursor,
       data: result.data,
     });
   } catch (error: any) {

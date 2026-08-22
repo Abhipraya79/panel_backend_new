@@ -24,6 +24,7 @@ async function toDashboardDTO(telemetry, deviceId = 'panel001') {
         voltage: telemetry.voltage ?? 0,
         current: telemetry.current ?? 0,
         power: telemetry.power ?? 0,
+        pwm_value: telemetry.pwm_value ?? telemetry.pwm ?? 0,
         pumpStatus: telemetry.pumpStatus ?? false,
         wiperStatus: telemetry.wiperStatus ?? false,
         mode: telemetry.mode ?? 'UNKNOWN',
