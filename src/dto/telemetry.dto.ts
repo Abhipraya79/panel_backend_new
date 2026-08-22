@@ -1,4 +1,6 @@
 import { DeviceRepository } from '../repositories/device.repository';
+import { env } from '../config/env';
+
 
 export interface DashboardDTO {
   deviceStatus: 'ONLINE' | 'OFFLINE';
@@ -23,13 +25,18 @@ export async function toDashboardDTO(
   telemetry: any,
   deviceId: string = 'panel001',
 ): Promise<DashboardDTO> {
-  // Read device status from Firestore (source of truth: ESP solar/panel/status topic)
+  // In DEMO_MODE, device is always ONLINE — bypass Firestore lookup
   let deviceStatus: 'ONLINE' | 'OFFLINE' = 'OFFLINE';
-  try {
-    deviceStatus = await DeviceRepository.getStatus(deviceId);
-  } catch {
-    // If device doc doesn't exist yet, default to OFFLINE
-    deviceStatus = 'OFFLINE';
+  if (env.DEMO_MODE) {
+    deviceStatus = 'ONLINE';
+  } else {
+    // Read device status from Firestore (source of truth: ESP solar/panel/status topic)
+    try {
+      deviceStatus = await DeviceRepository.getStatus(deviceId);
+    } catch {
+      // If device doc doesn't exist yet, default to OFFLINE
+      deviceStatus = 'OFFLINE';
+    }
   }
 
   return {

@@ -4,6 +4,10 @@ import temperatureMonitoringService from '../services/temperature-monitoring.ser
 import { TelemetryPayload } from '../validators/telemetry.validator';
 import { cleaningSimulator } from './cleaning.simulator';
 import { coolingSimulator } from './cooling.simulator';
+import { DeviceRepository } from '../repositories/device.repository';
+import { getSocketIO } from '../socket/socket.server';
+import { SOCKET_EVENTS } from '../socket/socket.events';
+
 
 
 const DEVICE_ID = 'panel001';
@@ -113,6 +117,28 @@ async function tick(): Promise<void> {
   }
 }
 
+// ─── Device ONLINE Emitter ───────────────────────────────────────────────────
+// Called on simulator start and every 30s to keep device status fresh
+
+async function _emitDeviceOnline(): Promise<void> {
+  try {
+    // 1. Update Firestore devices/panel001 → status: ONLINE
+    await DeviceRepository.updateStatus(DEVICE_ID, 'ONLINE');
+    logger.info('[DEMO MODE] Device status set to ONLINE in Firestore');
+
+    // 2. Emit Socket.IO status:update so Flutter sees ONLINE immediately
+    const io = getSocketIO();
+    io.emit(SOCKET_EVENTS.STATUS_UPDATE, {
+      deviceId: DEVICE_ID,
+      status: 'ONLINE',
+      connectionType: 'DEMO',
+    });
+    logger.info(`[DEMO MODE] Emitted ${SOCKET_EVENTS.STATUS_UPDATE} — ONLINE (DEMO)`);
+  } catch (err: any) {
+    logger.error(`[DEMO MODE] Failed to emit device ONLINE: ${err.message}`);
+  }
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export function startTelemetrySimulator(): void {
@@ -125,6 +151,20 @@ export function startTelemetrySimulator(): void {
   logger.warn(`[DEMO MODE] Interval: ${INTERVAL_MS}ms (${INTERVAL_MS / 1000}s)`);
   logger.warn(`[DEMO MODE] Device  : ${DEVICE_ID}`);
 
+  // ─── Immediately set device status to ONLINE ──────────────────────────────────
+  // This sets Firestore devices/panel001.status = 'ONLINE'
+  // and emits status:update Socket.IO event so Flutter sees ONLINE immediately
+  _emitDeviceOnline();
+
+  // Re-emit ONLINE every 30s to prevent stale status (ESP heartbeat equivalent)
+  const heartbeatInterval = setInterval(() => {
+    if (_timer !== null) {
+      _emitDeviceOnline();
+    } else {
+      clearInterval(heartbeatInterval);
+    }
+  }, 30_000);
+
   // Run first tick immediately so dashboard isn't blank on startup
   tick();
 
@@ -133,13 +173,20 @@ export function startTelemetrySimulator(): void {
   }, INTERVAL_MS);
 }
 
+
 export function stopTelemetrySimulator(): void {
   if (_timer !== null) {
     clearInterval(_timer);
     _timer = null;
     logger.warn('[DEMO MODE] Telemetry simulator stopped');
+
+    // Reset device to OFFLINE when simulator stops
+    DeviceRepository.updateStatus(DEVICE_ID, 'OFFLINE').catch((err: any) => {
+      logger.error(`[DEMO MODE] Failed to reset device status to OFFLINE: ${err.message}`);
+    });
   }
 }
+
 
 export function setSimulatorMode(mode: 'MANUAL' | 'AUTO'): void {
   state.mode = mode;

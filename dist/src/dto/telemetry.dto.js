@@ -2,19 +2,26 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.toDashboardDTO = toDashboardDTO;
 const device_repository_1 = require("../repositories/device.repository");
+const env_1 = require("../config/env");
 /**
  * Transforms raw telemetry data from Firestore into DashboardDTO format.
  * Device status is resolved from the devices collection (set by MQTT solar/panel/status topic).
  */
 async function toDashboardDTO(telemetry, deviceId = 'panel001') {
-    // Read device status from Firestore (source of truth: ESP solar/panel/status topic)
+    // In DEMO_MODE, device is always ONLINE — bypass Firestore lookup
     let deviceStatus = 'OFFLINE';
-    try {
-        deviceStatus = await device_repository_1.DeviceRepository.getStatus(deviceId);
+    if (env_1.env.DEMO_MODE) {
+        deviceStatus = 'ONLINE';
     }
-    catch {
-        // If device doc doesn't exist yet, default to OFFLINE
-        deviceStatus = 'OFFLINE';
+    else {
+        // Read device status from Firestore (source of truth: ESP solar/panel/status topic)
+        try {
+            deviceStatus = await device_repository_1.DeviceRepository.getStatus(deviceId);
+        }
+        catch {
+            // If device doc doesn't exist yet, default to OFFLINE
+            deviceStatus = 'OFFLINE';
+        }
     }
     return {
         deviceStatus,

@@ -12,6 +12,9 @@ const telemetry_service_1 = require("../services/telemetry.service");
 const temperature_monitoring_service_1 = __importDefault(require("../services/temperature-monitoring.service"));
 const cleaning_simulator_1 = require("./cleaning.simulator");
 const cooling_simulator_1 = require("./cooling.simulator");
+const device_repository_1 = require("../repositories/device.repository");
+const socket_server_1 = require("../socket/socket.server");
+const socket_events_1 = require("../socket/socket.events");
 const DEVICE_ID = 'panel001';
 const TOPIC = 'solar/panel/telemetry';
 const INTERVAL_MS = 3000; // 3 seconds — same as real system
@@ -89,6 +92,26 @@ async function tick() {
         logger_1.default.error(`[DEMO MODE] Telemetry generation error: ${err.message}`);
     }
 }
+// ─── Device ONLINE Emitter ───────────────────────────────────────────────────
+// Called on simulator start and every 30s to keep device status fresh
+async function _emitDeviceOnline() {
+    try {
+        // 1. Update Firestore devices/panel001 → status: ONLINE
+        await device_repository_1.DeviceRepository.updateStatus(DEVICE_ID, 'ONLINE');
+        logger_1.default.info('[DEMO MODE] Device status set to ONLINE in Firestore');
+        // 2. Emit Socket.IO status:update so Flutter sees ONLINE immediately
+        const io = (0, socket_server_1.getSocketIO)();
+        io.emit(socket_events_1.SOCKET_EVENTS.STATUS_UPDATE, {
+            deviceId: DEVICE_ID,
+            status: 'ONLINE',
+            connectionType: 'DEMO',
+        });
+        logger_1.default.info(`[DEMO MODE] Emitted ${socket_events_1.SOCKET_EVENTS.STATUS_UPDATE} — ONLINE (DEMO)`);
+    }
+    catch (err) {
+        logger_1.default.error(`[DEMO MODE] Failed to emit device ONLINE: ${err.message}`);
+    }
+}
 // ─── Public API ───────────────────────────────────────────────────────────────
 function startTelemetrySimulator() {
     if (_timer !== null) {
@@ -98,6 +121,19 @@ function startTelemetrySimulator() {
     logger_1.default.warn(`[DEMO MODE] Dummy telemetry generator started`);
     logger_1.default.warn(`[DEMO MODE] Interval: ${INTERVAL_MS}ms (${INTERVAL_MS / 1000}s)`);
     logger_1.default.warn(`[DEMO MODE] Device  : ${DEVICE_ID}`);
+    // ─── Immediately set device status to ONLINE ──────────────────────────────────
+    // This sets Firestore devices/panel001.status = 'ONLINE'
+    // and emits status:update Socket.IO event so Flutter sees ONLINE immediately
+    _emitDeviceOnline();
+    // Re-emit ONLINE every 30s to prevent stale status (ESP heartbeat equivalent)
+    const heartbeatInterval = setInterval(() => {
+        if (_timer !== null) {
+            _emitDeviceOnline();
+        }
+        else {
+            clearInterval(heartbeatInterval);
+        }
+    }, 30_000);
     // Run first tick immediately so dashboard isn't blank on startup
     tick();
     _timer = setInterval(() => {
@@ -109,6 +145,10 @@ function stopTelemetrySimulator() {
         clearInterval(_timer);
         _timer = null;
         logger_1.default.warn('[DEMO MODE] Telemetry simulator stopped');
+        // Reset device to OFFLINE when simulator stops
+        device_repository_1.DeviceRepository.updateStatus(DEVICE_ID, 'OFFLINE').catch((err) => {
+            logger_1.default.error(`[DEMO MODE] Failed to reset device status to OFFLINE: ${err.message}`);
+        });
     }
 }
 function setSimulatorMode(mode) {
