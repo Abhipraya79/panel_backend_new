@@ -60,7 +60,7 @@ async function _finishCleaning(): Promise<void> {
 
 /**
  * Start a cleaning simulation cycle.
- * Duration is taken from env.DEMO_CLEANING_DURATION_MS (default 30s).
+ * Duration is taken from env.DEMO_CLEANING_DURATION_MS (default 10s).
  * Calling this while already running will be ignored.
  */
 export async function startCleaning(): Promise<void> {

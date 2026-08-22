@@ -22,7 +22,7 @@ const envSchema = z.object({
   DEMO_CLEANING_DURATION_MS: z
     .string()
     .transform((val) => parseInt(val, 10))
-    .default('30000'),
+    .default('10000'),
 
   // MQTT Settings (required only when DEMO_MODE=false)
   MQTT_HOST: z.string().default(''),
