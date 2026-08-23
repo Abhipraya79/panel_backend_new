@@ -3,45 +3,52 @@ import logger from '../utils/logger';
 
 export type SimulationTimeMode = 'REAL_TIME' | 'FIXED' | 'ACCELERATED';
 
-interface HourlyProfileKeyframe {
+export interface RefKeyframe {
+  timeStr: string;
   hour: number;
-  tempMin: number;
-  tempMax: number;
-  voltageMin: number;
-  voltageMax: number;
-  currentMin: number;
-  currentMax: number;
+  temp: number;
+  pwm: number;
 }
 
 /**
- * Midday Solar Thermal Profile (WIB / UTC+7)
- * Strictly matches requirement:
- *   10:00 - 11:00 -> ~38 - 45°C
- *   11:00 - 11:30 -> ~42 - 48°C
- *   11:30 - 12:00 -> ~45 - 52°C
- *   12:00 - 12:30 -> ~48 - 56°C
- *   12:30 - 13:00 -> ~50 - 60°C
+ * Excel Reference Monitoring Data (11:00 WIB - 13:00 WIB)
+ * Thesis Reference Dataset: Panel Temp (°C) & PWM
  */
-const MIDDAY_KEYFRAMES: HourlyProfileKeyframe[] = [
-  { hour: 7.0,  tempMin: 41.0, tempMax: 43.0, voltageMin: 4.8, voltageMax: 5.0, currentMin: 1.5, currentMax: 2.0 },
-  { hour: 9.0,  tempMin: 41.0, tempMax: 44.0, voltageMin: 4.8, voltageMax: 5.0, currentMin: 2.5, currentMax: 3.2 },
-  { hour: 10.0, tempMin: 41.5, tempMax: 44.0, voltageMin: 4.8, voltageMax: 5.0, currentMin: 3.0, currentMax: 3.6 },
-  { hour: 11.0, tempMin: 42.0, tempMax: 46.0, voltageMin: 4.75, voltageMax: 4.95, currentMin: 3.5, currentMax: 4.0 },
-  { hour: 11.5, tempMin: 45.0, tempMax: 50.0, voltageMin: 4.70, voltageMax: 4.90, currentMin: 3.7, currentMax: 4.2 },
-  { hour: 12.0, tempMin: 48.0, tempMax: 54.0, voltageMin: 4.65, voltageMax: 4.85, currentMin: 3.9, currentMax: 4.35 },
-  { hour: 12.5, tempMin: 50.0, tempMax: 58.0, voltageMin: 4.60, voltageMax: 4.80, currentMin: 4.0, currentMax: 4.4 },
-  { hour: 13.0, tempMin: 52.0, tempMax: 60.0, voltageMin: 4.65, voltageMax: 4.85, currentMin: 3.8, currentMax: 4.3 },
-  { hour: 14.0, tempMin: 48.0, tempMax: 54.0, voltageMin: 4.70, voltageMax: 4.90, currentMin: 3.5, currentMax: 4.0 },
-  { hour: 16.0, tempMin: 43.0, tempMax: 47.0, voltageMin: 4.75, voltageMax: 4.95, currentMin: 2.5, currentMax: 3.2 },
-  { hour: 18.0, tempMin: 41.0, tempMax: 43.0, voltageMin: 4.2, voltageMax: 4.5, currentMin: 0.8, currentMax: 1.2 },
+export const EXCEL_REFERENCE_DATA: RefKeyframe[] = [
+  { timeStr: '11:00', hour: 11.0,         temp: 57.8, pwm: 255 },
+  { timeStr: '11:05', hour: 11.083333333, temp: 55.4, pwm: 255 },
+  { timeStr: '11:10', hour: 11.166666667, temp: 52.6, pwm: 252 },
+  { timeStr: '11:15', hour: 11.25,        temp: 49.7, pwm: 247 },
+  { timeStr: '11:20', hour: 11.333333333, temp: 46.9, pwm: 240 },
+  { timeStr: '11:25', hour: 11.416666667, temp: 44.3, pwm: 233 },
+  { timeStr: '11:30', hour: 11.5,         temp: 42.1, pwm: 226 },
+  { timeStr: '11:35', hour: 11.583333333, temp: 40.2, pwm: 220 },
+  { timeStr: '11:40', hour: 11.666666667, temp: 38.4, pwm: 216 },
+  { timeStr: '11:45', hour: 11.75,        temp: 37.0, pwm: 213 },
+  { timeStr: '11:50', hour: 11.833333333, temp: 36.0, pwm: 211 },
+  { timeStr: '11:55', hour: 11.916666667, temp: 35.4, pwm: 210 },
+  { timeStr: '12:00', hour: 12.0,         temp: 35.1, pwm: 212 },
+  { timeStr: '12:05', hour: 12.083333333, temp: 34.9, pwm: 208 },
+  { timeStr: '12:10', hour: 12.166666667, temp: 35.2, pwm: 214 },
+  { timeStr: '12:15', hour: 12.25,        temp: 34.8, pwm: 209 },
+  { timeStr: '12:20', hour: 12.333333333, temp: 35.0, pwm: 212 },
+  { timeStr: '12:25', hour: 12.416666667, temp: 35.2, pwm: 216 },
+  { timeStr: '12:30', hour: 12.5,         temp: 34.9, pwm: 210 },
+  { timeStr: '12:35', hour: 12.583333333, temp: 35.1, pwm: 215 },
+  { timeStr: '12:40', hour: 12.666666667, temp: 35.3, pwm: 219 },
+  { timeStr: '12:45', hour: 12.75,        temp: 35.0, pwm: 214 },
+  { timeStr: '12:50', hour: 12.833333333, temp: 34.8, pwm: 211 },
+  { timeStr: '12:55', hour: 12.916666667, temp: 35.1, pwm: 217 },
+  { timeStr: '13:00', hour: 13.0,         temp: 35.3, pwm: 221 },
 ];
 
 export class SolarTimeEngine {
-  private mode: SimulationTimeMode = env.SIMULATION_TIME_MODE;
+  private mode: SimulationTimeMode = env.DEMO_MODE ? 'ACCELERATED' : env.SIMULATION_TIME_MODE;
   private fixedHour: number | null = null;
-  private acceleratedBaseSimTimeSeconds: number = 11 * 3600; // default 11:00 WIB
+  private startSimHour: number = SolarTimeEngine.parseTimeStringToHour(env.SIMULATION_START_TIME || '11:00');
+  private endSimHour: number = SolarTimeEngine.parseTimeStringToHour(env.SIMULATION_END_TIME || '13:00');
+  private recordingDurationSeconds: number = env.RECORDING_DURATION_SECONDS || 600;
   private acceleratedStartRealMs: number = Date.now();
-  private speed: number = env.SIMULATION_SPEED;
 
   constructor() {
     if (env.SIMULATION_TIME) {
@@ -66,14 +73,29 @@ export class SolarTimeEngine {
     return `${h}:${m}:${s}`;
   }
 
+  public resetClock(): void {
+    this.acceleratedStartRealMs = Date.now();
+    logger.info(`[TIME ENGINE] Simulation clock reset to ${SolarTimeEngine.formatHourToString(this.startSimHour)}`);
+  }
+
+  public setRecordingDurationSeconds(durationSecs: number): void {
+    this.recordingDurationSeconds = Math.max(10, durationSecs);
+    this.acceleratedStartRealMs = Date.now();
+    logger.info(`[TIME ENGINE] Recording duration set to: ${this.recordingDurationSeconds}s (${(this.recordingDurationSeconds / 60).toFixed(1)} mins)`);
+  }
+
+  public getRecordingDurationSeconds(): number {
+    return this.recordingDurationSeconds;
+  }
+
+  public getSpeedMultiplier(): number {
+    const totalSimSecs = (this.endSimHour - this.startSimHour) * 3600;
+    return totalSimSecs / Math.max(1, this.recordingDurationSeconds);
+  }
+
   public setMode(mode: SimulationTimeMode): void {
     this.mode = mode;
     logger.info(`[TIME ENGINE] Simulation mode changed to: ${mode}`);
-  }
-
-  public setSpeed(speed: number): void {
-    this.speed = Math.max(0.1, speed);
-    logger.info(`[TIME ENGINE] Simulation speed set to: ${this.speed}x`);
   }
 
   public setFixedTimeString(timeStr: string | null): void {
@@ -83,16 +105,14 @@ export class SolarTimeEngine {
       return;
     }
     this.fixedHour = SolarTimeEngine.parseTimeStringToHour(timeStr);
-    this.acceleratedBaseSimTimeSeconds = this.fixedHour * 3600;
-    this.acceleratedStartRealMs = Date.now();
+    this.mode = 'FIXED';
     logger.info(`[TIME ENGINE] Set fixed simulation time: ${timeStr} (${this.fixedHour.toFixed(2)}h)`);
   }
 
   public setFixedHour(hour: number | null): void {
     this.fixedHour = hour;
     if (hour !== null) {
-      this.acceleratedBaseSimTimeSeconds = hour * 3600;
-      this.acceleratedStartRealMs = Date.now();
+      this.mode = 'FIXED';
     }
   }
 
@@ -101,15 +121,21 @@ export class SolarTimeEngine {
     effectiveHour: number;
     formattedTime: string;
     speed: number;
+    recordingDurationSeconds: number;
     fixedHour: number | null;
+    startSimTime: string;
+    endSimTime: string;
   } {
     const h = this.getEffectiveHour();
     return {
       mode: this.mode,
-      effectiveHour: parseFloat(h.toFixed(2)),
+      effectiveHour: parseFloat(h.toFixed(4)),
       formattedTime: SolarTimeEngine.formatHourToString(h),
-      speed: this.speed,
+      speed: parseFloat(this.getSpeedMultiplier().toFixed(2)),
+      recordingDurationSeconds: this.recordingDurationSeconds,
       fixedHour: this.fixedHour,
+      startSimTime: env.SIMULATION_START_TIME,
+      endSimTime: env.SIMULATION_END_TIME,
     };
   }
 
@@ -119,11 +145,16 @@ export class SolarTimeEngine {
       return this.fixedHour;
     }
 
-    if (this.mode === 'ACCELERATED') {
+    if (this.mode === 'ACCELERATED' || env.DEMO_MODE) {
       const elapsedRealSecs = (Date.now() - this.acceleratedStartRealMs) / 1000.0;
-      const simElapsedSecs = elapsedRealSecs * this.speed;
-      const totalSimSecs = (this.acceleratedBaseSimTimeSeconds + simElapsedSecs) % 86400;
-      return totalSimSecs / 3600.0;
+      const speed = this.getSpeedMultiplier();
+      const simElapsedSecs = elapsedRealSecs * speed;
+      const totalSimSecs = this.startSimHour * 3600 + simElapsedSecs;
+      const maxSimSecs = this.endSimHour * 3600;
+
+      // Clamp at endSimHour if elapsed exceeds recording duration
+      const clampedSimSecs = Math.min(maxSimSecs, totalSimSecs);
+      return clampedSimSecs / 3600.0;
     }
 
     // REAL_TIME mode: UTC+7 (WIB)
@@ -135,8 +166,53 @@ export class SolarTimeEngine {
   }
 
   /**
-   * Calculates baseline target solar heating temperature, voltage, and current
-   * interpolated for the current effective hour.
+   * Linear Interpolation from the 25 Reference Keyframes (11:00 - 13:00 WIB)
+   * Returns exact reference temperature (°C) and reference PWM (0-255) for fractional hour h.
+   */
+  public getRefDataAtHour(hour?: number): {
+    refTemp: number;
+    refPwm: number;
+  } {
+    const h = hour ?? this.getEffectiveHour();
+
+    if (h <= EXCEL_REFERENCE_DATA[0].hour) {
+      return {
+        refTemp: EXCEL_REFERENCE_DATA[0].temp,
+        refPwm: EXCEL_REFERENCE_DATA[0].pwm,
+      };
+    }
+
+    const lastIdx = EXCEL_REFERENCE_DATA.length - 1;
+    if (h >= EXCEL_REFERENCE_DATA[lastIdx].hour) {
+      return {
+        refTemp: EXCEL_REFERENCE_DATA[lastIdx].temp,
+        refPwm: EXCEL_REFERENCE_DATA[lastIdx].pwm,
+      };
+    }
+
+    let lower = EXCEL_REFERENCE_DATA[0];
+    let upper = EXCEL_REFERENCE_DATA[lastIdx];
+
+    for (let i = 0; i < EXCEL_REFERENCE_DATA.length - 1; i++) {
+      if (h >= EXCEL_REFERENCE_DATA[i].hour && h <= EXCEL_REFERENCE_DATA[i + 1].hour) {
+        lower = EXCEL_REFERENCE_DATA[i];
+        upper = EXCEL_REFERENCE_DATA[i + 1];
+        break;
+      }
+    }
+
+    const fraction = upper.hour === lower.hour ? 0 : (h - lower.hour) / (upper.hour - lower.hour);
+    const refTemp = lower.temp + fraction * (upper.temp - lower.temp);
+    const refPwm = Math.round(lower.pwm + fraction * (upper.pwm - lower.pwm));
+
+    return {
+      refTemp: parseFloat(refTemp.toFixed(2)),
+      refPwm,
+    };
+  }
+
+  /**
+   * Returns solar thermal target profile (used for voltage & current calculations)
    */
   public getTargetSolarProfile(hour?: number): {
     targetTemp: number;
@@ -144,41 +220,20 @@ export class SolarTimeEngine {
     targetCurrent: number;
   } {
     const h = hour ?? this.getEffectiveHour();
+    const { refTemp } = this.getRefDataAtHour(h);
 
-    if (h <= 6.0) {
-      return { targetTemp: 41.0, targetVoltage: 4.5, targetCurrent: 0.5 };
-    }
-    if (h >= 19.0) {
-      return { targetTemp: 41.0, targetVoltage: 4.0, targetCurrent: 0.3 };
-    }
+    // Voltage & Current curves tied smoothly to solar peak around 11:30 - 12:30
+    const solarPeakNorm = Math.max(0, 1 - Math.pow((h - 12.0) / 2.0, 2));
+    const targetVoltage = parseFloat((4.85 - (refTemp - 35.0) * 0.012).toFixed(2));
+    const targetCurrent = parseFloat((3.60 + solarPeakNorm * 0.70).toFixed(2));
 
-    let lower = MIDDAY_KEYFRAMES[0];
-    let upper = MIDDAY_KEYFRAMES[MIDDAY_KEYFRAMES.length - 1];
-
-    for (let i = 0; i < MIDDAY_KEYFRAMES.length - 1; i++) {
-      if (h >= MIDDAY_KEYFRAMES[i].hour && h <= MIDDAY_KEYFRAMES[i + 1].hour) {
-        lower = MIDDAY_KEYFRAMES[i];
-        upper = MIDDAY_KEYFRAMES[i + 1];
-        break;
-      }
-    }
-
-    const fraction = lower.hour === upper.hour ? 0 : (h - lower.hour) / (upper.hour - lower.hour);
-
-    const lowerTempMid = (lower.tempMin + lower.tempMax) / 2;
-    const upperTempMid = (upper.tempMin + upper.tempMax) / 2;
-    const targetTemp = lowerTempMid + fraction * (upperTempMid - lowerTempMid);
-
-    const lowerVoltMid = (lower.voltageMin + lower.voltageMax) / 2;
-    const upperVoltMid = (upper.voltageMin + upper.voltageMax) / 2;
-    const targetVoltage = lowerVoltMid + fraction * (upperVoltMid - lowerVoltMid);
-
-    const lowerCurrMid = (lower.currentMin + lower.currentMax) / 2;
-    const upperCurrMid = (upper.currentMin + upper.currentMax) / 2;
-    const targetCurrent = lowerCurrMid + fraction * (upperCurrMid - lowerCurrMid);
-
-    return { targetTemp, targetVoltage, targetCurrent };
+    return {
+      targetTemp: refTemp,
+      targetVoltage: Math.max(3.5, Math.min(5.0, targetVoltage)),
+      targetCurrent: Math.max(1.0, Math.min(4.4, targetCurrent)),
+    };
   }
 }
 
 export const solarTimeEngine = new SolarTimeEngine();
+

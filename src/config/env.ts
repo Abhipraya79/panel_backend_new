@@ -24,6 +24,10 @@ const envSchema = z.object({
     .default('REAL_TIME'),
   SIMULATION_START_TIME: z.string().default('11:00'),
   SIMULATION_END_TIME: z.string().default('13:00'),
+  RECORDING_DURATION_SECONDS: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .default('600'),
   SIMULATION_TIME: z.string().optional(),
   SIMULATION_SPEED: z
     .string()

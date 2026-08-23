@@ -18,16 +18,35 @@ const _state: CoolingState = {
   pwm_value: 0,
 };
 
-// ─── PWM Calculation ──────────────────────────────────────────────────────────
-// Threshold based on env.PANEL_OVERHEAT_TEMP = 45°C
-// Cooling ramps up well before overheat for demo visibility
+import { solarTimeEngine } from './solar-time.engine';
 
-function calculatePwmForTemp(temperature: number): number {
-  if (temperature < 30)  return 0;
-  if (temperature < 32)  return 80;
-  if (temperature < 34)  return 140;
-  if (temperature < 36)  return 200;
-  return 255;
+// ─── PWM Calculation ──────────────────────────────────────────────────────────
+// STRICT LOGIC:
+// If Cooling == OFF -> PWM = 0 strictly
+// If Cooling == ON  -> PWM is dynamically controlled based on panel temperature and reference curve (255 down to ~208-212)
+
+function calculatePwmForTemp(temperature: number, hour?: number): number {
+  if (!_state.isCooling) {
+    _state.pwm_value = 0;
+    return 0;
+  }
+
+  // When Cooling is active, calculate PWM based on reference curve matching temperature
+  const { refPwm } = solarTimeEngine.getRefDataAtHour(hour);
+
+  // Proportional control calculation relative to target temperature (~35.0°C)
+  const targetTemp = 35.0;
+  if (temperature <= targetTemp) {
+    _state.pwm_value = Math.min(refPwm, 210);
+  } else {
+    // Smoothly scale between 210 (at 35.0°C) and 255 (at 57.8°C)
+    const norm = Math.min(1.0, Math.max(0, (temperature - targetTemp) / (57.8 - targetTemp)));
+    const calculatedPwm = Math.round(210 + (255 - 210) * norm);
+    // Blend with reference PWM to stay faithful to the reference dataset curve
+    _state.pwm_value = Math.round((calculatedPwm + refPwm) / 2);
+  }
+
+  return _state.pwm_value;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -39,14 +58,15 @@ function calculatePwmForTemp(temperature: number): number {
  */
 async function setCooling(start: boolean): Promise<void> {
   _state.isCooling = start;
-  _state.pwm_value = start ? 128 : 0; // start at midpoint, will adjust with temperature
+  if (!start) {
+    _state.pwm_value = 0;
+  }
 
   const action = start ? 'START' : 'STOP';
   const eventName = start ? 'Cooling cycle started' : 'Cooling cycle stopped';
 
   if (start) {
     logger.warn('[DEMO COOLING] Cooling STARTED');
-    logger.warn(`[DEMO COOLING] PWM: ${_state.pwm_value}`);
     logger.warn('[DEMO COOLING] Fan: ON | Peltier: ON');
   } else {
     logger.warn('[DEMO COOLING] Cooling STOPPED');

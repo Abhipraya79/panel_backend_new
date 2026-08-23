@@ -21,6 +21,9 @@ infoRouter.get('/', (_req: Request, res: Response) => {
       effectiveHour: simConfig.effectiveHour,
       formattedTime: simConfig.formattedTime,
       speed: simConfig.speed,
+      recordingDurationSeconds: simConfig.recordingDurationSeconds,
+      startSimTime: simConfig.startSimTime,
+      endSimTime: simConfig.endSimTime,
       fixedHour: simConfig.fixedHour,
     },
   });
@@ -32,9 +35,11 @@ infoRouter.get('/', (_req: Request, res: Response) => {
  * Allows live adjustment of simulation parameters for recording/demo purposes.
  * Body parameters:
  *   - mode?: 'REAL_TIME' | 'FIXED' | 'ACCELERATED'
+ *   - recordingDurationSeconds?: number (e.g. 600 for 10 min, 480 for 8 min)
+ *   - durationMinutes?: number (e.g. 10 or 8)
+ *   - reset?: boolean (resets simulation clock to 11:00)
  *   - time?: string (e.g. "11:45" or "12:30")
  *   - hour?: number (e.g. 11.75)
- *   - speed?: number (e.g. 10)
  */
 infoRouter.post('/simulator-config', (req: Request, res: Response) => {
   if (!env.DEMO_MODE) {
@@ -45,22 +50,26 @@ infoRouter.post('/simulator-config', (req: Request, res: Response) => {
     return;
   }
 
-  const { mode, time, hour, speed } = req.body;
+  const { mode, recordingDurationSeconds, durationMinutes, reset, time, hour } = req.body;
 
   if (mode && ['REAL_TIME', 'FIXED', 'ACCELERATED'].includes(mode)) {
     solarTimeEngine.setMode(mode as SimulationTimeMode);
   }
 
-  if (typeof time === 'string') {
-    solarTimeEngine.setFixedTimeString(time);
-    solarTimeEngine.setMode('FIXED');
-  } else if (typeof hour === 'number') {
-    solarTimeEngine.setFixedHour(hour);
-    solarTimeEngine.setMode('FIXED');
+  if (typeof recordingDurationSeconds === 'number') {
+    solarTimeEngine.setRecordingDurationSeconds(recordingDurationSeconds);
+  } else if (typeof durationMinutes === 'number') {
+    solarTimeEngine.setRecordingDurationSeconds(durationMinutes * 60);
   }
 
-  if (typeof speed === 'number') {
-    solarTimeEngine.setSpeed(speed);
+  if (reset === true) {
+    solarTimeEngine.resetClock();
+  }
+
+  if (typeof time === 'string') {
+    solarTimeEngine.setFixedTimeString(time);
+  } else if (typeof hour === 'number') {
+    solarTimeEngine.setFixedHour(hour);
   }
 
   const updatedConfig = solarTimeEngine.getConfig();
